@@ -1,0 +1,199 @@
+/* ---------- Tokens ---------- */
+/* Dark mode is the default. body.light-mode overrides these variables. */
+:root {
+  --ink: #14263a;       /* always-dark navy: HUD, nav bar, outlines on colored fills */
+  --paper: #0f1c2b;     /* page background */
+  --card: #1a2c40;      /* cards and panels */
+  --text: #e6eef5;      /* body text */
+  --muted: #93a8ba;
+  --line: #2d4257;
+  --edge: #4e6a84;      /* input and card borders */
+  --gold: #f2b632;      /* money, primary actions */
+  --gold-ink: #3a2a00;
+  --green: #3f8f6b;     /* income */
+  --red: #c2443a;       /* debt, danger */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-h: 64px;
+}
+body.light-mode {
+  --paper: #e8eef1;
+  --card: #ffffff;
+  --text: #14263a;
+  --muted: #5d7085;
+  --line: #d3dde3;
+  --edge: #14263a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--ink); color: var(--text);
+  font-family: "Avenir Next", "Trebuchet MS", system-ui, sans-serif; }
+body { display: flex; justify-content: center; overflow: hidden; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+
+/* ---------- App shell ---------- */
+#app { width: 100%; max-width: 480px; height: 100dvh; display: flex; flex-direction: column; background: var(--paper); }
+main { flex: 1; overflow-y: auto; padding: 0 12px 16px; }
+.view { display: none; }
+.view.active { display: block; }
+
+/* ---------- HUD ---------- */
+.hud { display: flex; gap: 8px; padding: calc(10px + var(--safe-top)) 12px 8px; background: var(--ink); color: #fff; }
+.stat { flex: 1; min-width: 0; }
+.stat .label { display: block; font-size: 0.72rem; color: #9fb3c4; }
+.stat strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#debt { color: #ff9b8f; }
+#income { color: #8fe0b8; }
+#cash { color: var(--gold); }
+
+.tick-bar { position: relative; height: 20px; background: #0d1b2b; overflow: hidden; margin-bottom: 12px; }
+#tick-fill { height: 100%; width: 0; background: var(--green); }
+#tick-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.72rem; font-weight: 600; color: #fff; }
+
+/* ---------- Status colors and legend ---------- */
+:root { --c-sale: #f2b632; --c-repair: #e9856f; --c-ready: #7fb2e5; --c-rented: #7cc9a0; --c-owned: #9db4c6; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: .78rem; color: var(--muted); }
+.legend i { display: inline-block; width: 11px; height: 11px; margin-right: 5px; border-radius: 3px; border: 1px solid var(--ink); vertical-align: -1px; }
+
+.pill { color: var(--ink); display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 700; border: 1px solid var(--ink); }
+.pill.sale { background: var(--c-sale); } .pill.repair { background: var(--c-repair); }
+.pill.ready { background: var(--c-ready); } .pill.rented { background: var(--c-rented); }
+
+/* ---------- Panels & buttons ---------- */
+.panel { background: var(--card); border-radius: 14px; padding: 14px; margin-top: 12px; border: 1px solid var(--line); }
+.panel h2 { font-size: 1.1rem; margin-bottom: 8px; }
+.row { display: flex; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
+.row:last-child { border-bottom: 0; }
+
+.btn { display: block; width: 100%; margin-top: 12px; padding: 13px; border: 0; border-radius: 10px;
+  background: var(--gold); color: var(--gold-ink); font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; }
+.btn.ghost { background: var(--line); color: var(--text); }
+.btn.danger { background: var(--red); color: #fff; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+
+/* ---------- Bottom navigation ---------- */
+.bottom-nav { display: flex; height: calc(var(--nav-h) + var(--safe-bottom)); padding-bottom: var(--safe-bottom); background: var(--ink); }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: none; border: 0; color: #9fb3c4; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.nav-btn span { font-size: 1.35rem; }
+.nav-btn.active { color: var(--gold); }
+
+/* ---------- Overlays ---------- */
+.overlay { position: fixed; inset: 0; z-index: 10; background: rgba(10,22,36,.94); display: flex; align-items: center; justify-content: center;
+  padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom)); overflow-y: auto; }
+.sheet { width: 100%; max-width: 440px; background: var(--paper); border-radius: 18px; padding: 20px; }
+.sheet h1 { font-size: 1.45rem; margin-bottom: 8px; }
+
+.loan-card { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; margin-top: 10px; padding: 14px; text-align: left;
+  background: var(--card); border: 2px solid var(--edge); border-radius: 12px; font: inherit; color: var(--text); cursor: pointer; }
+.loan-card .amount { font-size: 1.2rem; font-weight: 800; color: var(--green); }
+.loan-card small { grid-column: 1 / -1; color: var(--muted); }
+.loan-card:active { border-color: var(--gold); }
+
+.toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + var(--safe-bottom) + 14px); transform: translateX(-50%);
+  background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 999px; font-size: 0.9rem; font-weight: 600; z-index: 20; }
+
+@media (prefers-reduced-motion: no-preference) {
+  #tick-fill { transition: width 0.25s linear; }
+}
+
+/* ---------- Stage 3: broken state, career ---------- */
+:root { --c-broken: #b23b3b; }
+.pill.broken { background: var(--c-broken); color: #fff; }
+.work-btn { padding: 22px; font-size: 1.3rem; border-radius: 16px; box-shadow: 0 4px 0 #b98a16; }
+.work-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b98a16; }
+.item { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.item:last-child { border-bottom: 0; }
+.item .row { padding: 0 0 6px; border: 0; }
+.item .btn { margin-top: 4px; padding: 10px; font-size: .9rem; }
+.bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--green); }
+
+/* ---------- Stage 4: negative cash, error banner ---------- */
+#cash.neg { color: #ff9b8f; }
+#error-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 99; background: #b23b3b; color: #fff; padding: 8px 12px; font-size: .8rem; }
+
+/* ---------- Stage 5: bank dashboard, property management, settings ---------- */
+.field { display: block; margin-top: 14px; font-size: .85rem; color: var(--muted); }
+.field input { display: block; width: 100%; margin-top: 4px; padding: 12px; border: 2px solid var(--edge); border-radius: 10px;
+  background: var(--card); color: var(--text); font: inherit; font-size: 1rem; }
+.meter + .meter { margin-top: 14px; }
+.meter-label { display: flex; justify-content: space-between; font-size: .85rem; font-weight: 600; }
+.bar-debt i { background: var(--red); }
+.manage { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.manage .btn { margin-top: 0; padding: 10px 6px; font-size: .82rem; line-height: 1.25; }
+.manage .wide { grid-column: 1 / -1; }
+.btn.sell { background: var(--red); color: #fff; }
+
+/* ---------- Stage 6: district chips, property hub and popup, chart ---------- */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; padding: 8px 12px; border: 2px solid var(--edge); border-radius: 999px; background: var(--card); color: var(--text);
+  font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.chip.active { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+.chip.locked { opacity: .6; }
+
+.row.center { align-items: center; }
+.btn-sm { display: inline-block; width: auto; margin: 0; padding: 8px 14px; font-size: .85rem; }
+
+.sheet { max-height: 90dvh; overflow-y: auto; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.sheet-head h1 { margin: 0; }
+.close-btn { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--line); color: var(--text); font-size: 1.1rem; cursor: pointer; }
+
+#finance-chart { display: block; width: 100%; height: auto; border-radius: 10px; background: var(--paper); }
+
+/* ---------- Stage 7: scrollable map window with a fixed-size map and pins ---------- */
+.map-hint { margin: 0 0 8px; }
+
+/* The window you look through. The map inside it is bigger, so you swipe or drag to pan. */
+.map-stage, .map-scroll { width: 100%; aspect-ratio: 4 / 5; overflow: auto; border-radius: 14px; border: 2px solid var(--edge);
+  background: #cfd8dc; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-x pan-y; cursor: grab; }
+.map-stage.dragging, .map-scroll.dragging { cursor: grabbing; user-select: none; }
+
+/* The map itself: a FIXED 16:9 size, so the picture is never stretched or blurred.
+   The picture fills the box exactly, so a pin at x% / y% lands on the same spot of the drawing. */
+.map-world { position: relative; flex: none; width: 1200px; height: 675px;
+  background:
+    url('assets/map.jpg') 0 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(0deg, rgba(20,38,58,.07) 0 2px, transparent 2px 60px),
+    repeating-linear-gradient(90deg, rgba(20,38,58,.07) 0 2px, transparent 2px 60px),
+    linear-gradient(160deg, #d5e3d0, #cfdde6 50%, #e4dcc9); }
+#map-zones, #map-pins { position: absolute; inset: 0; pointer-events: none; }
+
+/* District areas: invisible unless selected (gold outline) or locked (dimmed with a label). */
+.zone { position: absolute; display: flex; align-items: center; justify-content: center;
+  border: 2px dashed transparent; border-radius: 14px; }
+.zone.locked { border: 2px solid rgba(20,38,58,.5);
+  background: repeating-linear-gradient(45deg, rgba(20,38,58,.5) 0 8px, rgba(20,38,58,.34) 8px 16px); }
+.zone.sel { border-color: var(--gold); }
+.zone.sel:not(.locked) { background: rgba(242,182,50,.1); }
+.zone-label { padding: 5px 10px; border-radius: 8px; background: rgba(255,255,255,.93); color: var(--ink);
+  font-size: .85rem; font-weight: 800; text-align: center; }
+.zone-label small { display: block; font-size: .68rem; font-weight: 600; color: #5d7085; }
+
+/* A pin is the round head plus a small pointer. The pointer's TIP sits exactly on the x / y spot. */
+.pin { position: absolute; width: 36px; height: 36px; padding: 0; border: 0; background: none; font: inherit;
+  transform: translate(-50%, calc(-100% - 10px)); cursor: pointer; z-index: 2; pointer-events: auto; }
+.pin-dot { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  font-size: 1rem; border: 3px solid var(--ink); background: var(--c-sale); box-shadow: 0 3px 0 var(--ink); }
+.pin-dot::after { content: ''; position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%);
+  border: 6px solid transparent; border-top: 8px solid var(--ink); border-bottom: 0; }
+.pin-tag { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 14px; padding: 1px 6px;
+  border-radius: 6px; background: rgba(255,255,255,.93); color: var(--ink); font-size: .62rem; font-weight: 700;
+  white-space: nowrap; border: 1px solid var(--ink); }
+.pin.sale .pin-dot { background: var(--c-sale); } .pin.repair .pin-dot { background: var(--c-repair); }
+.pin.ready .pin-dot { background: var(--c-ready); } .pin.rented .pin-dot { background: var(--c-rented); }
+.pin.broken .pin-dot { background: var(--c-broken); }
+.pin.sel .pin-dot { outline: 3px solid #fff; }
+.pin:active .pin-dot { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .pin.broken .pin-dot { animation: pulse 1.4s infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 3px 0 var(--ink), 0 0 0 0 rgba(178,59,59,.6); }
+    50% { box-shadow: 0 3px 0 var(--ink), 0 0 0 12px rgba(178,59,59,0); }
+  }
+}

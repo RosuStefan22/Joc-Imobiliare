@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Landlord Empire</string>
+    <string name="title_activity_main">Landlord Empire</string>
+    <string name="package_name">com.stefan.landlord</string>
+    <string name="custom_url_scheme">com.stefan.landlord</string>
+</resources>

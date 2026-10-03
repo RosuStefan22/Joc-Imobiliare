@@ -1,0 +1,2685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14263a">
+  <title>Landlord Empire</title>
+  <style>
+/* ---------- Tokens ---------- */
+/* Dark mode is the default. body.light-mode overrides these variables. */
+:root {
+  --ink: #14263a;       /* always-dark navy: HUD, nav bar, outlines on colored fills */
+  --paper: #0f1c2b;     /* page background */
+  --card: #1a2c40;      /* cards and panels */
+  --text: #e6eef5;      /* body text */
+  --muted: #93a8ba;
+  --line: #2d4257;
+  --edge: #4e6a84;      /* input and card borders */
+  --gold: #f2b632;      /* money, primary actions */
+  --gold-ink: #3a2a00;
+  --green: #3f8f6b;     /* income */
+  --red: #c2443a;       /* debt, danger */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-h: 64px;
+  --map-img: url('assets/map_night.png');   /* dark mode map (light mode below) */
+  --glass: rgba(22,38,56,.82);             /* frosted bottom sheet */
+  --glass-tile: rgba(255,255,255,.06);
+  --glass-edge: rgba(255,255,255,.14);
+}
+body.light-mode {
+  --map-img: url('assets/map.jpg');
+  --glass: rgba(255,255,255,.84);
+  --glass-tile: rgba(20,38,58,.05);
+  --glass-edge: rgba(20,38,58,.12);
+  --paper: #e8eef1;
+  --card: #ffffff;
+  --text: #14263a;
+  --muted: #5d7085;
+  --line: #d3dde3;
+  --edge: #14263a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+/* No visible scrollbars anywhere: every tab and popup still scrolls by swipe, wheel or drag. */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+html, body { height: 100%; background: var(--ink); color: var(--text);
+  font-family: "Avenir Next", "Trebuchet MS", system-ui, sans-serif; }
+body { display: flex; justify-content: center; overflow: hidden; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+
+/* ---------- App shell ---------- */
+#app { width: 100%; max-width: 480px; height: 100dvh; display: flex; flex-direction: column; background: var(--paper); }
+main { flex: 1; overflow-y: auto; padding: 0 12px 16px; }
+.view { display: none; }
+.view.active { display: block; }
+
+/* ---------- HUD ---------- */
+.hud { display: flex; gap: 8px; padding: calc(10px + var(--safe-top)) 12px 8px; background: var(--ink); color: #fff; }
+.stat { flex: 1; min-width: 0; }
+.stat .label { display: block; font-size: 0.72rem; color: #9fb3c4; }
+.stat strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#debt { color: #ff9b8f; }
+#income { color: #8fe0b8; }
+#cash { color: var(--gold); }
+
+.tick-bar { position: relative; height: 22px; background: #0d1b2b; overflow: hidden; margin-bottom: 12px; }
+#tick-fill { height: 100%; width: 0; background: var(--green); }
+.tick-labels { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px;
+  font-size: 0.72rem; font-weight: 700; color: #fff; white-space: nowrap; }
+#date-text { padding: 1px 8px; border-radius: 999px; background: rgba(255,255,255,.14); }
+
+/* ---------- Status colors and legend ---------- */
+:root { --c-sale: #f2b632; --c-repair: #e9856f; --c-ready: #7fb2e5; --c-rented: #7cc9a0; --c-owned: #9db4c6; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: .78rem; color: var(--muted); }
+.legend i { display: inline-block; width: 11px; height: 11px; margin-right: 5px; border-radius: 3px; border: 1px solid var(--ink); vertical-align: -1px; }
+
+.pill { color: var(--ink); display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 700; border: 1px solid var(--ink); }
+.pill.sale { background: var(--c-sale); } .pill.repair { background: var(--c-repair); }
+.pill.ready { background: var(--c-ready); } .pill.rented { background: var(--c-rented); }
+
+/* ---------- Panels & buttons ---------- */
+.panel { background: var(--card); border-radius: 14px; padding: 14px; margin-top: 12px; border: 1px solid var(--line); }
+.panel h2 { font-size: 1.1rem; margin-bottom: 8px; }
+.row { display: flex; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
+.row:last-child { border-bottom: 0; }
+
+.btn { display: block; width: 100%; margin-top: 12px; padding: 13px; border: 0; border-radius: 10px;
+  background: var(--gold); color: var(--gold-ink); font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; }
+.btn.ghost { background: var(--line); color: var(--text); }
+.btn.danger { background: var(--red); color: #fff; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+
+/* ---------- Bottom navigation ---------- */
+.bottom-nav { display: flex; height: calc(var(--nav-h) + var(--safe-bottom)); padding-bottom: var(--safe-bottom); background: var(--ink); }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: none; border: 0; color: #9fb3c4; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.nav-btn span { font-size: 1.35rem; }
+.nav-btn.active { color: var(--gold); }
+
+/* ---------- Overlays ---------- */
+.overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(10,22,36,.94); display: flex; align-items: center; justify-content: center;
+  padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom)); overflow-y: auto; }
+.sheet { width: 100%; max-width: 440px; background: var(--paper); border-radius: 18px; padding: 20px; }
+.sheet h1 { font-size: 1.45rem; margin-bottom: 8px; }
+
+.loan-card { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; margin-top: 10px; padding: 14px; text-align: left;
+  background: var(--card); border: 2px solid var(--edge); border-radius: 12px; font: inherit; color: var(--text); cursor: pointer; }
+.loan-card .amount { font-size: 1.2rem; font-weight: 800; color: var(--green); }
+.loan-card small { grid-column: 1 / -1; color: var(--muted); }
+.loan-card:active { border-color: var(--gold); }
+
+.toast { position: fixed; left: 50%; bottom: calc(100px + var(--safe-bottom)); transform: translateX(-50%); z-index: 10001;
+  max-width: calc(100% - 32px); width: max-content; text-align: center; pointer-events: none;   /* never blocks a button */
+  background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 999px; font-size: 0.9rem; font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+/* While a bottom sheet is open its buttons fill the lower screen, so toasts move up under the HUD instead. */
+body.sheet-open .toast { bottom: auto; top: calc(var(--safe-top) + 84px); }
+
+@media (prefers-reduced-motion: no-preference) {
+  #tick-fill { transition: width 0.25s linear; }
+}
+
+/* ---------- Stage 3: broken state, career ---------- */
+:root { --c-broken: #b23b3b; }
+.pill.broken { background: var(--c-broken); color: #fff; }
+/* Work button: built to be spammed. touch-action: manipulation turns off double-tap zoom (and the tap delay that
+   comes with it); the press state is instant (no transition, no animation). */
+.btn.work-btn { padding: 22px; font-size: 1.3rem; border-radius: 16px; box-shadow: 0 4px 0 #b98a16;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  transition: none; animation: none; }
+.btn.work-btn:active:not(:disabled) { transform: scale(0.95); box-shadow: 0 1px 0 #b98a16; transition: none; }
+.item { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.item:last-child { border-bottom: 0; }
+.item .row { padding: 0 0 6px; border: 0; }
+.item .btn { margin-top: 4px; padding: 10px; font-size: .9rem; }
+.bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--green); }
+
+/* ---------- Stage 4: negative cash, error banner ---------- */
+#cash.neg { color: #ff9b8f; }
+#error-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 10002; background: #b23b3b; color: #fff; padding: 8px 12px; font-size: .8rem; }
+
+/* ---------- Stage 5: bank dashboard, property management, settings ---------- */
+.field { display: block; margin-top: 14px; font-size: .85rem; color: var(--muted); }
+.field input { display: block; width: 100%; margin-top: 4px; padding: 12px; border: 2px solid var(--edge); border-radius: 10px;
+  background: var(--card); color: var(--text); font: inherit; font-size: 1rem; }
+.meter + .meter { margin-top: 14px; }
+.meter-label { display: flex; justify-content: space-between; font-size: .85rem; font-weight: 600; }
+.bar-debt i { background: var(--red); }
+.manage { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.manage .btn { margin-top: 0; padding: 10px 6px; font-size: .82rem; line-height: 1.25; }
+.manage .wide { grid-column: 1 / -1; }
+.btn.sell { background: var(--red); color: #fff; }
+
+/* ---------- Stage 6: property hub and popup, chart ---------- */
+
+.row.center { align-items: center; }
+.btn-sm { display: inline-block; width: auto; margin: 0; padding: 8px 14px; font-size: .85rem; }
+
+.sheet { max-height: 90dvh; max-width: 100%; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; }
+.overlay { overflow-x: hidden; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.sheet-head h1 { margin: 0; }
+.close-btn { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--line); color: var(--text); font-size: 1.1rem; cursor: pointer; }
+
+#finance-chart { display: block; width: 100%; height: auto; border-radius: 10px; background: var(--paper); }
+
+/* ---------- Stage 7: full-screen map window with a fixed-ratio map and pins ---------- */
+/* On the Map tab the map fills everything between the month bar and the bottom nav. */
+#app.map-mode .tick-bar { margin-bottom: 0; }
+#app.map-mode main { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+#app.map-mode #view-map.active { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+
+/* The window you look through. The map inside it is bigger, so you swipe or drag to pan. */
+.map-scroll { flex: 1; min-height: 0; width: 100%; overflow: auto;
+  background: #cfd8dc; scrollbar-width: none; -ms-overflow-style: none; overscroll-behavior: contain;
+  touch-action: none; cursor: grab; user-select: none; }
+.map-scroll::-webkit-scrollbar { display: none; }
+.map-scroll.dragging { cursor: grabbing; }
+
+/* The map itself: a FIXED 16:9 size, so the picture is never stretched or blurred.
+   The picture fills the box exactly, so a pin at x% / y% lands on the same spot of the drawing. */
+/* isolation keeps every z-index inside the map (clouds, labels, pins) below the popups; overflow keeps pins and
+   labels near the edge from making the scroll area bigger than the map picture. */
+.map-world { position: relative; flex: none; width: 1376px; height: 768px; isolation: isolate; overflow: hidden;
+  background:
+    var(--map-img) 0 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(0deg, rgba(20,38,58,.07) 0 2px, transparent 2px 60px),
+    repeating-linear-gradient(90deg, rgba(20,38,58,.07) 0 2px, transparent 2px 60px),
+    linear-gradient(160deg, #d5e3d0, #cfdde6 50%, #e4dcc9); }
+/* Map layers, bottom to top: map picture -> clouds (#map-fog, 50) -> lock labels (#map-labels, 55) -> pins (#map-pins, 60). */
+#map-pins { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
+#map-labels { position: absolute; inset: 0; z-index: 55; pointer-events: none; }
+
+/* Fog of war: one full-map transparent PNG per district (assets/cloud_1.png .. cloud_5.png, same size as the map).
+   All layers share z-index 50 and are kept in DOM order north -> south, so southern clouds overlap northern ones.
+   Lock labels and pins live in their own layers above the fog. Dark mode swaps in cloud_N_night.png. */
+#map-fog { position: absolute; inset: 0; z-index: 50; overflow: hidden; pointer-events: none !important; }
+#map-fog * { pointer-events: none !important; }   /* clouds are only a picture: taps always reach the map and pins */
+.fog-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; max-width: none; pointer-events: none; z-index: 50;
+  user-select: none; -webkit-user-drag: none; }
+.fog-layer.missing { display: none; }   /* picture not found: hide it instead of showing a broken image */
+.zone-tag { position: absolute; transform: translate(-50%, -50%); padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  background: rgba(20,38,58,.85); color: #fff; font-size: .72rem; font-weight: 700; pointer-events: none; transition: opacity .4s; }
+.zone-tag.gone { opacity: 0; }
+/* Unlock: in one keyframe the cloud pulses (scale 1 -> 1.1 -> 1 -> 1.1 -> 1) while sliding a full map width
+   sideways (--dir = -1 left, 1 right) and fading out. transform-origin is set to the district's center in JS. */
+@media (prefers-reduced-motion: no-preference) {
+  .fog-layer.clearing { will-change: transform, opacity; animation: fogClear 2.6s ease-in forwards; }
+  @keyframes fogClear {
+    0%   { transform: translateX(0) scale(1); opacity: 1; }
+    25%  { transform: translateX(calc(var(--dir, 1) * 12%)) scale(1.1); opacity: 1; }
+    50%  { transform: translateX(calc(var(--dir, 1) * 40%)) scale(1); opacity: .8; }
+    75%  { transform: translateX(calc(var(--dir, 1) * 70%)) scale(1.1); opacity: .45; }
+    100% { transform: translateX(calc(var(--dir, 1) * 100%)) scale(1); opacity: 0; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fog-layer.clearing { animation: fogFade .6s forwards; }
+  @keyframes fogFade { to { opacity: 0; } }
+}
+
+/* Floating map controls: info pill at the top, legend at the bottom-left. */
+.map-info { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3; width: max-content; max-width: calc(100% - 24px);
+  padding: 7px 14px; border-radius: 999px; background: rgba(20,38,58,.88); color: #fff; font-size: .82rem; font-weight: 700;
+  text-align: center; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+.map-legend { position: absolute; left: 10px; bottom: 10px; z-index: 3; max-width: calc(100% - 20px); border-radius: 12px;
+  background: rgba(20,38,58,.88); color: #fff; font-size: .75rem; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+.map-legend summary { padding: 7px 12px; font-weight: 700; cursor: pointer; list-style: none; }
+.map-legend summary::-webkit-details-marker { display: none; }
+.map-legend .legend { margin: 0; padding: 0 12px 10px; color: #dfe8ef; flex-direction: column; gap: 5px; }
+
+/* A pin is the round head plus a small pointer. The pointer's TIP sits exactly on the x / y spot. */
+.pin { position: absolute; width: 40px; height: 40px; padding: 0; border: 0; background: none; font: inherit;
+  transform: translate(-50%, calc(-100% - 10px)); cursor: pointer; z-index: 2; pointer-events: auto; }
+.pin-dot { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  font-size: 1.35rem; border: 3px solid var(--ink); background: var(--c-sale); box-shadow: 0 3px 0 var(--ink); }
+.pin-dot::after { content: ''; position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%);
+  border: 6px solid transparent; border-top: 8px solid var(--ink); border-bottom: 0; }
+.pin-tag { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 14px; padding: 1px 6px;
+  border-radius: 6px; background: rgba(255,255,255,.93); color: var(--ink); font-size: .62rem; font-weight: 700;
+  white-space: nowrap; border: 1px solid var(--ink); }
+.pin.sale .pin-dot { background: var(--c-sale); } .pin.repair .pin-dot { background: var(--c-repair); }
+.pin.ready .pin-dot { background: var(--c-ready); } .pin.rented .pin-dot { background: var(--c-rented); }
+.pin.broken .pin-dot { background: var(--c-broken); }
+.pin.sel .pin-dot { outline: 3px solid #fff; }
+.pin:active .pin-dot { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .pin.broken .pin-dot { animation: pulse 1.4s infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 3px 0 var(--ink), 0 0 0 0 rgba(178,59,59,.6); }
+    50% { box-shadow: 0 3px 0 var(--ink), 0 0 0 12px rgba(178,59,59,0); }
+  }
+}
+
+/* ---------- Stage 8: breakdown banner, dev buttons, locked loans ---------- */
+.btn-row { display: flex; gap: 8px; }
+.btn-row .btn { flex: 1; padding: 12px 6px; font-size: .9rem; }
+.loan-card.locked, .loan-card:disabled { opacity: .55; cursor: default; }
+
+.alert { position: fixed; top: 0; left: 50%; width: 100%; max-width: 480px; z-index: 10001; display: flex; align-items: center; gap: 10px;
+  padding: calc(10px + var(--safe-top)) 12px 10px; background: var(--c-broken); color: #fff; font-size: .88rem; font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0,0,0,.4); transform: translate(-50%, -130%); transition: transform .45s ease; pointer-events: none; }
+.alert.show { transform: translate(-50%, 0); pointer-events: auto; }
+.alert span { flex: 1; }
+.alert-btn { flex: none; padding: 8px 12px; border: 0; border-radius: 8px; background: #fff; color: var(--c-broken);
+  font: inherit; font-weight: 800; cursor: pointer; }
+
+/* ---------- Stage 9: career cards, bank payments, audio sliders, dev menu, prestige, big modals ---------- */
+.section-title { margin: 18px 2px 0; font-size: 1rem; }
+
+/* Career: current job card */
+.job-hero { position: relative; overflow: hidden; }
+.job-head { display: flex; gap: 12px; align-items: center; }
+.job-icon { flex: none; width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; font-size: 2.2rem;
+  background: var(--gold); border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--ink); }
+.job-info { min-width: 0; }
+.job-info h2 { margin: 2px 0; font-size: 1.25rem; }
+.job-path { font-size: .78rem; font-weight: 700; color: var(--muted); }
+.job-pay { font-weight: 800; color: var(--green); }
+.promo { margin-top: 14px; }
+.promo .btn { margin-top: 10px; }
+.bar-xp { height: 14px; border-radius: 7px; }
+.bar-xp i { background: linear-gradient(90deg, var(--gold), #f7d26b); }
+.top-badge { margin-top: 12px; padding: 10px; border-radius: 10px; background: var(--paper); text-align: center; font-weight: 700; }
+.float-pay { position: absolute; z-index: 2; font-weight: 800; font-size: 1.1rem; color: var(--green); pointer-events: none;
+  text-shadow: 0 1px 0 var(--card); transform: translateX(-50%); }
+
+/* Career: path cards drawn as a small skill tree */
+.path-card { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 12px; margin-top: 10px; }
+.path-card.current { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(242,182,50,.25); }
+.path-card.locked { opacity: .6; }
+.path-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.path-head strong { font-size: 1rem; }
+.path-head .muted { font-size: .78rem; }
+.tree { display: flex; margin-top: 12px; }
+.node { flex: 1; position: relative; min-width: 0; text-align: center; }
+.node span { position: relative; z-index: 1; display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 50%;
+  font-size: 1.3rem; background: var(--paper); border: 3px solid var(--line); filter: grayscale(1); opacity: .65; }
+.node.done span { border-color: var(--green); filter: none; opacity: 1; }
+.node.cur span { border-color: var(--ink); background: var(--gold); filter: none; opacity: 1; transform: scale(1.12); }
+.node + .node::before { content: ''; position: absolute; top: 19px; right: 50%; width: 100%; height: 4px; background: var(--line); }
+.node.done::before, .node.cur::before { background: var(--green); }
+.node small { display: block; margin-top: 5px; padding: 0 2px; font-size: .62rem; line-height: 1.15; color: var(--muted); }
+.node.cur small { color: var(--text); font-weight: 700; }
+.path-foot { margin-top: 10px; }
+.path-foot .btn { margin-top: 6px; padding: 10px; font-size: .9rem; }
+.path-foot .bar { margin-top: 0; }
+.lock-note { font-size: .82rem; font-weight: 600; color: var(--muted); }
+
+/* Career: education card grid */
+.dgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.dcard { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; text-align: center;
+  background: var(--card); border: 2px solid var(--line); border-radius: 14px; }
+.dicon { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; font-size: 1.9rem; background: var(--paper); }
+.dcard strong { font-size: .88rem; line-height: 1.2; }
+.dcard small { font-size: .72rem; color: var(--muted); }
+.dfoot { width: 100%; margin-top: auto; padding-top: 6px; }
+.dfoot .bar { margin-top: 0; }
+.dcard.earned { border-color: var(--green); }
+.dcard.studying { border-color: var(--gold); }
+.dcard.locked { opacity: .55; }
+.dcard.locked .dicon { filter: grayscale(1); }
+.btn-card { margin-top: 0; padding: 9px 4px; font-size: .82rem; }
+
+/* Bank: overview tiles, loan cards, payment center */
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kpi { padding: 10px 12px; border-radius: 12px; background: var(--paper); border-left: 4px solid var(--edge); min-width: 0; }
+.kpi small { display: block; font-size: .75rem; font-weight: 600; color: var(--muted); }
+.kpi strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.kpi.cash { border-color: var(--gold); } .kpi.debt { border-color: var(--red); }
+.kpi.due { border-color: var(--c-ready); } .kpi.assets { border-color: var(--green); }
+.kpi strong.neg { color: var(--red); }
+.bar-cover { height: 12px; border-radius: 6px; }
+.section-title .muted { font-size: .78rem; font-weight: 600; margin-left: 4px; }
+.loan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 10px; }
+.loan-tile { position: relative; overflow: hidden; padding: 16px 14px 14px; border-radius: 16px; background: var(--card);
+  border: 1px solid var(--line); box-shadow: 0 3px 0 var(--line); }
+.loan-tile::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 5px; background: linear-gradient(90deg, var(--red), var(--gold)); }
+.lt-head { display: flex; align-items: center; gap: 8px; }
+.lt-icon, .tile-icon { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; font-size: 1.2rem;
+  background: var(--paper); border: 1px solid var(--line); }
+.lt-head strong, .tile-head strong { display: block; font-size: .92rem; }
+.lt-head small, .tile-head small { display: block; font-size: .72rem; color: var(--muted); }
+.lt-pct { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: rgba(63,143,107,.16); color: var(--green); font-size: .78rem; font-weight: 800; }
+.lt-amount { margin-top: 12px; }
+.lt-amount small { display: block; font-size: .72rem; color: var(--muted); }
+.lt-amount strong { font-size: 1.4rem; color: var(--red); font-variant-numeric: tabular-nums; }
+.loan-tile .bar { height: 10px; margin-top: 8px; }
+.loan-tile .bar i { background: var(--green); }
+.lt-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; margin-top: 6px; font-size: .74rem; color: var(--muted); }
+.loan-tile.empty { display: grid; place-items: center; min-height: 150px; text-align: center; background: transparent;
+  border: 2px dashed var(--edge); box-shadow: none; color: var(--muted); font-size: .85rem; }
+.loan-tile.empty::before { display: none; }
+.loan-tile.empty b { display: block; font-size: 1.6rem; }
+.pay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.pay-tile { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); }
+.pay-tile.wide { grid-column: 1 / -1; }
+.pay-tile .btn { margin-top: 0; }
+.pay-tile.danger-tile { border-color: rgba(194,68,58,.45); }
+.tile-head { display: flex; align-items: center; gap: 10px; }
+.tile-icon { background: var(--card); }
+.quick { display: flex; gap: 6px; }
+.quick button { flex: 1; padding: 7px 0; border: 2px solid var(--edge); border-radius: 999px; background: var(--card); color: var(--text);
+  font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.quick button:active { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+.payoff-btn { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 10px 12px; font-size: .84rem; text-align: left; }
+.payoff-btn span { font-variant-numeric: tabular-nums; }
+.payall-amount { font-size: 1.5rem; font-weight: 800; color: var(--red); font-variant-numeric: tabular-nums; }
+.payall-foot { margin-top: auto; }
+.bank-msg { min-height: 1.2em; margin-top: 10px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+.pay-row { display: flex; gap: 8px; margin-top: 4px; }
+.pay-row input { flex: 1; min-width: 0; padding: 12px; border: 2px solid var(--edge); border-radius: 10px;
+  background: var(--card); color: var(--text); font: inherit; font-size: 1rem; }
+.pay-row .btn { width: auto; margin: 0; padding: 0 22px; }
+
+/* Settings: sun / moon theme switch */
+.theme-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 6px 2px 2px;
+  background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.ts-text strong { display: block; font-size: 1rem; }
+.ts-text small { font-size: .8rem; color: var(--muted); }
+.ts-track { position: relative; flex: none; width: 78px; height: 40px; border-radius: 999px; border: 2px solid var(--ink);
+  background: linear-gradient(135deg, #9fdcff, #4fa6e8); transition: background .35s; overflow: hidden; }
+.ts-deco { position: absolute; top: 50%; transform: translateY(-50%); font-size: .9rem; transition: opacity .35s; }
+.ts-deco.cloud { right: 8px; }
+.ts-deco.stars { left: 9px; opacity: 0; color: #fff; }
+.ts-knob { position: absolute; top: 3px; left: 3px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  background: #fff6c9; box-shadow: 0 2px 5px rgba(0,0,0,.35); font-size: 1.05rem; transition: transform .35s cubic-bezier(.3,1.4,.5,1), background .35s; }
+.theme-switch[aria-checked="true"] .ts-track { background: linear-gradient(135deg, #1b2850, #3d2c6e); }
+.theme-switch[aria-checked="true"] .ts-knob { transform: translateX(38px); background: #e4e2ff; }
+.theme-switch[aria-checked="true"] .ts-deco.cloud { opacity: 0; }
+.theme-switch[aria-checked="true"] .ts-deco.stars { opacity: 1; }
+.theme-switch:focus-visible .ts-track { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* Settings: sliders, dev menu, prestige */
+.slider { display: block; margin-top: 14px; font-size: .88rem; font-weight: 600; }
+.slider-head { display: flex; justify-content: space-between; }
+.slider input { display: block; width: 100%; margin-top: 6px; accent-color: var(--gold); }
+.login-row { display: flex; gap: 8px; margin-top: 10px; }
+.login-row input { flex: 1; min-width: 0; padding: 10px 12px; border: 2px solid var(--edge); border-radius: 10px;
+  background: var(--card); color: var(--text); font: inherit; }
+.login-row .btn { width: auto; margin: 0; padding: 10px 18px; }
+.dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.dev-grid .btn { margin: 0; padding: 11px 6px; font-size: .85rem; }
+.prestige-active { display: inline-block; margin-bottom: 6px; padding: 4px 12px; border-radius: 999px;
+  background: linear-gradient(90deg, #6f52e8, #b85cc9); color: #fff; font-weight: 800; font-size: .85rem; }
+#prestige-badge { font-style: normal; font-weight: 700; color: #c9b6ff; }
+
+/* Big modals: bank seizure (stays above everything), victory, prestige confirmation */
+.overlay.top { z-index: 10000; }
+.sheet.alarm, .sheet.win { text-align: center; }
+.sheet.alarm { border: 3px solid var(--red); }
+.sheet.alarm h1 { color: var(--red); }
+.sheet.win { border: 3px solid var(--gold); box-shadow: 0 0 40px rgba(242,182,50,.45); }
+
+/* Property / buy popups: frosted bottom sheets. The backdrop only blurs lightly, so the pin centered above stays readable. */
+.overlay.dock { align-items: flex-end; padding: 0; background: linear-gradient(180deg, rgba(8,16,28,.08), rgba(8,16,28,.5));
+  -webkit-backdrop-filter: blur(1px) saturate(1.1); backdrop-filter: blur(1px) saturate(1.1); }
+.overlay.dock .sheet { position: relative; max-width: 480px; max-height: 60dvh; padding: 26px 18px calc(18px + var(--safe-bottom));
+  border-radius: 28px 28px 0 0; background: var(--glass); border: 1px solid var(--glass-edge); border-bottom: 0;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: 0 -12px 40px rgba(0,0,0,.35); }
+.overlay.dock .sheet::before { content: ''; position: absolute; top: 9px; left: 50%; width: 44px; height: 5px; margin-left: -22px;
+  border-radius: 3px; background: var(--edge); opacity: .45; }
+.overlay.dock .sheet-head h1 { font-size: 1.3rem; }
+.overlay.dock .close-btn { background: var(--glass-tile); border: 1px solid var(--glass-edge); }
+
+.pm-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.pm-icon { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; font-size: 1.7rem;
+  background: var(--glass-tile); border: 1px solid var(--glass-edge); }
+.pm-head small { display: block; font-size: .78rem; color: var(--muted); margin-top: 3px; }
+.pm-rent { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding: 14px 16px; border-radius: 18px;
+  background: linear-gradient(135deg, rgba(63,143,107,.95), rgba(42,110,82,.95)); color: #fff; box-shadow: 0 6px 18px rgba(42,110,82,.35); }
+.pm-rent.off { background: linear-gradient(135deg, #5d7085, #455668); box-shadow: none; }
+.pm-rent small { display: block; font-size: .75rem; font-weight: 700; opacity: .85; }
+.pm-rent strong { font-size: 1.7rem; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pm-rent em { font-style: normal; font-size: .75rem; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.2); }
+.pm-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.pm-stats div { min-width: 0; padding: 9px 12px; border-radius: 14px; background: var(--glass-tile); border: 1px solid var(--glass-edge); }
+.pm-stats small { display: block; font-size: .72rem; color: var(--muted); }
+.pm-stats strong { font-size: .98rem; font-variant-numeric: tabular-nums; }
+.pm-stars { color: var(--gold); letter-spacing: 2px; }
+.pm-stars i { font-style: normal; color: var(--muted); opacity: .45; }
+.overlay.dock .manage { gap: 10px; margin-top: 14px; }
+.overlay.dock .manage .btn, .overlay.dock .sheet > div > .btn { border-radius: 14px; padding: 12px 8px; font-size: .86rem; box-shadow: 0 4px 0 #b98a16; }
+.overlay.dock .manage .btn.ghost, .overlay.dock .sheet .btn.ghost { box-shadow: 0 4px 0 var(--edge); }
+.overlay.dock .manage .btn.sell { box-shadow: 0 4px 0 #8f2a22; }
+.overlay.dock .manage .btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.overlay.dock .manage .btn:disabled { box-shadow: none; }
+
+/* Bankruptcy: dramatic red screen */
+.overlay.danger-bg { background: radial-gradient(circle at 50% 30%, rgba(130,14,14,.96), rgba(18,3,5,.98) 70%); }
+.sheet.bankrupt { position: relative; text-align: center; color: #fff; background: linear-gradient(180deg, #2c0c10, #150507);
+  border: 3px solid #ff4d3d; box-shadow: 0 0 50px rgba(255,60,40,.5), inset 0 0 30px rgba(255,40,30,.15); }
+.bk-siren { font-size: 4.2rem; line-height: 1; }
+.bk-kicker { margin-top: 8px; font-size: .78rem; font-weight: 800; letter-spacing: .3em; color: #ff9b8f; }
+.bk-title { margin: 2px 0 6px; font-size: 3rem; font-weight: 900; letter-spacing: .04em; line-height: 1; color: #ff5a4a;
+  text-shadow: 0 0 18px rgba(255,70,50,.65); }
+.bk-sub { color: #f3c9c4; font-size: .92rem; line-height: 1.4; }
+.bk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; text-align: left; }
+.bk-tile { min-width: 0; overflow-wrap: anywhere; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,90,74,.35); }
+.bk-tile small { display: block; font-size: .72rem; color: #f3b1a9; }
+.bk-tile strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.bk-tile.wide { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bk-tile s { color: #c98c85; font-weight: 700; }
+.bk-tile .zero { color: #ff5a4a; font-size: 1.6rem; font-weight: 900; }
+.bk-note { margin-top: 12px; font-size: .85rem; font-weight: 700; color: #c9b6ff; }
+.btn.bk-btn { margin-top: 16px; background: #ff4d3d; color: #fff; font-size: 1.1rem; box-shadow: 0 4px 0 #8f1d14; }
+.btn.bk-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #8f1d14; }
+.big-icon { font-size: 3.4rem; line-height: 1; margin-bottom: 8px; }
+.sheet .stats { margin-top: 10px; text-align: left; }
+@media (prefers-reduced-motion: no-preference) {
+  .bar-xp i { transition: width .2s ease-out; }
+  .float-pay { animation: floatUp .8s ease-out forwards; }
+  @keyframes floatUp { from { opacity: 1; translate: 0 0; } to { opacity: 0; translate: 0 -46px; } }
+  .sheet.alarm .big-icon { animation: shake .5s ease-in-out 2; }
+  @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+  .sheet.win .big-icon { animation: bounce 1s ease-in-out infinite; }
+  @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  #promote-btn:not(:disabled) { animation: glow 1.2s ease-in-out infinite; }
+  /* Popup entrances: fade the backdrop, scale the sheet up from 80% (docked sheets slide up instead). */
+  .overlay:not(.hidden) { animation: fadeIn .25s ease-out; }
+  .overlay:not(.hidden) > .sheet { animation: popIn .38s cubic-bezier(.2,.9,.3,1.25); }
+  .overlay.dock:not(.hidden) > .sheet { animation: slideUp .42s cubic-bezier(.22,1,.36,1); }
+  .overlay:not(.hidden) > .sheet.bankrupt { animation: popIn .45s cubic-bezier(.2,.9,.3,1.3), shakeX .5s .45s ease-in-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes popIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes shakeX { 0%, 100% { translate: 0 0; } 20%, 60% { translate: -8px 0; } 40%, 80% { translate: 8px 0; } }
+  .bk-siren { animation: siren 1.1s ease-in-out infinite; }
+  @keyframes siren { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,60,40,0)); }
+    50% { transform: scale(1.12); filter: drop-shadow(0 0 18px rgba(255,60,40,.9)); } }
+
+  @keyframes glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(242,182,50,.6); } 50% { box-shadow: 0 0 0 8px rgba(242,182,50,0); } }
+}
+
+/* ---------- Stage 10: intro / first loan screen ---------- */
+#loan-screen { z-index: 9999; background: #0a1624; }
+#loan-screen::before { content: ''; position: fixed; inset: -24px; z-index: -1;
+  background: linear-gradient(180deg, rgba(10,22,36,.55), rgba(10,22,36,.92) 70%), var(--map-img) center / cover;
+  filter: blur(5px) saturate(1.15); }
+.sheet.intro { position: relative; text-align: center; color: #fff; background: rgba(20,38,58,.78); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.intro-hero { display: grid; place-items: center; width: 88px; height: 88px; margin: 4px auto 10px; border-radius: 50%; font-size: 2.8rem;
+  background: radial-gradient(circle at 35% 30%, #ffe08a, var(--gold) 60%, #c98e12); border: 3px solid var(--ink);
+  box-shadow: 0 0 0 6px rgba(242,182,50,.18), 0 10px 30px rgba(242,182,50,.35); }
+.intro-kicker { font-size: .72rem; font-weight: 800; letter-spacing: .3em; color: var(--gold); }
+.sheet.intro h1 { margin: 6px 0 6px; font-size: 1.6rem; line-height: 1.15; }
+.intro-sub { color: #b9c9d6; font-size: .92rem; line-height: 1.45; }
+.intro-steps { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 14px 0 4px; flex-wrap: wrap; }
+.intro-steps span { padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+  font-size: .78rem; font-weight: 700; }
+.intro-steps b { color: var(--gold); }
+.intro-bonus { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 999px; font-size: .8rem; font-weight: 800;
+  background: linear-gradient(90deg, #6f52e8, #b85cc9); }
+.intro-pick { margin: 16px 0 2px; font-size: .78rem; font-weight: 700; letter-spacing: .12em; color: #93a8ba; text-align: left; }
+
+.loan-card.intro-card { position: relative; overflow: hidden; grid-template-columns: 56px 1fr; gap: 6px 12px; align-items: center;
+  margin-top: 10px; padding: 16px 14px; color: #fff; text-align: left; border-radius: 18px; border: 2px solid rgba(255,255,255,.14);
+  background: linear-gradient(135deg, rgba(255,255,255,.11), rgba(255,255,255,.03));
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.loan-card.intro-card:hover:not(:disabled), .loan-card.intro-card:focus-visible {
+  transform: translateY(-3px); border-color: var(--gold); box-shadow: 0 12px 26px rgba(0,0,0,.4), 0 0 0 3px rgba(242,182,50,.25); outline: none; }
+.loan-card.intro-card:active:not(:disabled) { transform: scale(.98); }
+.loan-card.intro-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; transform: translateX(-110%);
+  background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.2) 50%, transparent 65%); }
+.loan-card.intro-card:hover:not(:disabled)::after { transform: translateX(110%); transition: transform .7s ease; }
+.ic-icon { grid-row: span 2; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; font-size: 1.8rem;
+  border: 2px solid rgba(0,0,0,.25); }
+.intro-card.family .ic-icon { background: linear-gradient(135deg, #5fd39b, #2f8f63); }
+.intro-card.bank .ic-icon { background: linear-gradient(135deg, #7fb2e5, #3d6fb8); }
+.intro-card.investor .ic-icon { background: linear-gradient(135deg, #b48cff, #6a43c9); }
+.ic-name { font-size: 1rem; font-weight: 800; padding-right: 92px; }
+.ic-amount { font-size: 1.55rem; font-weight: 900; color: var(--gold); font-variant-numeric: tabular-nums; line-height: 1; }
+.ic-badge { position: absolute; top: 12px; right: 12px; padding: 3px 9px; border-radius: 999px; font-size: .68rem; font-weight: 800;
+  background: var(--gold); color: var(--gold-ink); }
+.ic-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ic-chips span { padding: 3px 8px; border-radius: 8px; background: rgba(0,0,0,.22); font-size: .74rem; font-weight: 600; color: #dfe8ef; }
+.ic-cta { grid-column: 1 / -1; margin-top: 4px; font-size: .9rem; font-weight: 800; color: var(--gold); }
+.loan-card.intro-card.locked { filter: grayscale(.7); opacity: .6; }
+.intro-card.locked .ic-badge { background: #4e6a84; color: #fff; }
+.intro-card.locked .ic-cta { color: #b9c9d6; font-size: .78rem; font-weight: 600; }
+
+@media (prefers-reduced-motion: no-preference) {
+  #loan-screen:not(.hidden) > .sheet.intro { animation: introUp .6s cubic-bezier(.2,.85,.3,1.1) both; }
+  @keyframes introUp { from { opacity: 0; transform: translateY(60px) scale(.96); } to { opacity: 1; transform: none; } }
+  #loan-screen:not(.hidden) .intro-hero { animation: heroPop .7s .15s cubic-bezier(.2,.9,.3,1.4) both, heroFloat 3s 1s ease-in-out infinite; }
+  @keyframes heroPop { from { opacity: 0; transform: scale(.3) rotate(-20deg); } to { opacity: 1; transform: none; } }
+  @keyframes heroFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+  #loan-screen:not(.hidden) .intro-card { animation: cardIn .5s cubic-bezier(.2,.85,.3,1.15) both; animation-delay: calc(.35s + var(--i, 0) * .12s); }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+}
+</style>
+</head>
+<body class="light-mode">
+
+  <!-- MAIN APP (hidden until the starting loan is taken) -->
+  <div id="app" class="hidden map-mode">
+    <header class="hud">
+      <div class="stat"><span class="label">Cash</span><strong id="cash">$0</strong></div>
+      <div class="stat"><span class="label">Debt</span><strong id="debt">$0</strong></div>
+      <div class="stat"><span class="label">Rent per month <em id="prestige-badge" class="hidden"></em></span><strong id="income">$0</strong></div>
+    </header>
+
+    <div class="tick-bar" role="progressbar" aria-label="Time until next rent">
+      <div id="tick-fill"></div>
+      <div class="tick-labels"><span id="date-text"></span><span id="tick-text"></span></div>
+    </div>
+
+    <main>
+      <!-- MAP: scrollable world map with clickable pins (buy and manage properties here) -->
+      <section id="view-map" class="view active">
+        <div class="map-scroll" id="map-scroll">
+          <div class="map-world" id="map-world">
+            <div id="map-fog" aria-hidden="true"></div>
+            <div id="map-labels" aria-hidden="true"></div>
+            <div id="map-pins"></div>
+          </div>
+        </div>
+        <div class="map-info" id="map-info"></div>
+        <details class="map-legend">
+          <summary>🗺️ Legend</summary>
+          <div class="legend">
+            <span><i style="background:var(--c-sale)"></i>For sale</span>
+            <span><i style="background:var(--c-repair)"></i>Needs repair</span>
+            <span><i style="background:var(--c-ready)"></i>Ready to rent</span>
+            <span><i style="background:var(--c-rented)"></i>Rented</span>
+            <span><i style="background:var(--c-broken)"></i>Broken</span>
+          </div>
+        </details>
+      </section>
+
+      <!-- CAREER (rendered by script.js) -->
+      <section id="view-career" class="view"><div id="career-root"></div></section>
+
+      <!-- BANK -->
+      <section id="view-bank" class="view">
+        <div class="panel">
+          <h2>🏦 Overview</h2>
+          <div class="kpis">
+            <div class="kpi cash"><small>💰 Cash</small><strong id="bank-cash"></strong></div>
+            <div class="kpi debt"><small>🧾 Total debt</small><strong id="bank-debt"></strong></div>
+            <div class="kpi due"><small>⏱️ Due every month</small><strong id="bank-due"></strong></div>
+            <div class="kpi assets"><small>🏠 Property value</small><strong id="bank-assets"></strong></div>
+          </div>
+          <div class="meter-label" style="margin-top:12px"><span>Cash covers your debt</span><span id="cover-text"></span></div>
+          <div class="bar bar-cover"><i id="cover-fill"></i></div>
+        </div>
+
+        <h2 class="section-title">💳 Your loans <span class="muted" id="loan-count"></span></h2>
+        <div class="loan-grid" id="loan-list"></div>
+
+        <div class="panel">
+          <h2>💸 Payment center</h2>
+          <div class="pay-grid">
+            <div class="pay-tile wide">
+              <div class="tile-head"><span class="tile-icon">✍️</span>
+                <div><strong>Custom payment</strong><small>Goes to your oldest loan first</small></div></div>
+              <div class="pay-row">
+                <input type="number" id="pay-amount" min="1" step="100" inputmode="numeric" placeholder="Amount in $" aria-label="Payment amount">
+                <button class="btn" id="pay-btn">Pay</button>
+              </div>
+              <div class="quick" id="pay-quick">
+                <button data-pct="0.1">10%</button><button data-pct="0.25">25%</button><button data-pct="0.5">50%</button><button data-pct="1">Max</button>
+              </div>
+            </div>
+            <div class="pay-tile" id="payoff-tile"></div>
+            <div class="pay-tile danger-tile" id="payall-wrap"></div>
+          </div>
+          <p class="bank-msg" id="bank-msg"></p>
+        </div>
+
+        <div class="panel">
+          <h2>📈 Cash vs debt</h2>
+          <canvas id="finance-chart" width="640" height="300"></canvas>
+          <div class="legend">
+            <span><i style="background:var(--gold)"></i>Cash</span>
+            <span><i style="background:var(--red)"></i>Debt</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>🏦 Take a new loan</h2>
+          <div id="new-loans"></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="view-settings" class="view">
+        <div class="panel">
+          <h2>Appearance</h2>
+          <button class="theme-switch" id="theme-btn" role="switch" aria-checked="false" aria-label="Dark mode">
+            <span class="ts-text"><strong id="theme-name">☀️ Light mode</strong><small id="theme-hint">Tap to switch to dark mode</small></span>
+            <span class="ts-track"><span class="ts-deco stars">✦ ✧</span><span class="ts-deco cloud">☁️</span><span class="ts-knob" id="theme-knob">☀️</span></span>
+          </button>
+        </div>
+        <div class="panel">
+          <h2>Audio</h2>
+          <p class="muted">Sound is off until you turn it on.</p>
+          <button class="btn ghost" id="audio-btn">Unmute audio</button>
+          <label class="slider"><span class="slider-head"><span>🎵 Music volume</span><span id="music-vol-text"></span></span>
+            <input type="range" id="music-vol" min="0" max="1" step="0.1">
+          </label>
+          <label class="slider"><span class="slider-head"><span>🔊 Sound effects volume</span><span id="sfx-vol-text"></span></span>
+            <input type="range" id="sfx-vol" min="0" max="1" step="0.1">
+          </label>
+        </div>
+        <div class="panel">
+          <h2>📳 Haptics</h2>
+          <p class="muted" id="vibe-note">Short vibrations on taps, longer ones for warnings and game over.</p>
+          <button class="btn ghost" id="vibe-btn">Vibration: On</button>
+        </div>
+        <div class="panel">
+          <h2>⭐ Prestige</h2>
+          <span class="prestige-active" id="prestige-active"></span>
+          <p class="muted" id="prestige-info"></p>
+          <button class="btn" id="prestige-btn">Prestige / Restart with Bonus</button>
+        </div>
+        <div class="panel">
+          <h2>🛠️ Developer menu</h2>
+          <div id="dev-login">
+            <p class="muted">Locked. Enter the developer password.</p>
+            <div class="login-row">
+              <input type="password" id="dev-pass" placeholder="Password" autocomplete="off">
+              <button class="btn" id="dev-login-btn">Login</button>
+            </div>
+            <p class="muted" id="dev-msg" style="margin-top:6px"></p>
+          </div>
+          <div id="dev-tools" class="hidden">
+            <p class="muted">For testing only.</p>
+            <div class="dev-grid">
+              <button class="btn" id="dev-cash-btn">💵 Add $100,000</button>
+              <button class="btn" id="dev-cash-btn-1m">💰 Add $1,000,000</button>
+              <button class="btn ghost" id="dev-degrees-btn">🎓 Unlock all degrees</button>
+              <button class="btn ghost" id="dev-debt-btn">🧾 Clear all debt</button>
+              <button class="btn ghost" id="dev-break-btn">🔧 Force breakdown</button>
+              <button class="btn ghost" id="dev-buyall-btn">🏘️ Buy all properties</button>
+              <button class="btn ghost" id="dev-repairall-btn">🛠️ Repair all</button>
+              <button class="btn ghost" id="dev-lock-btn">🔒 Lock menu</button>
+            </div>
+            <button class="btn danger" id="reset-btn">Erase save and restart (hard reset, clears prestige)</button>
+          </div>
+        </div>
+        <p class="muted" id="version" style="margin-top:12px; text-align:center">Script not loaded, or an old script.js is still in use.</p>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-tab="map"><span>🗺️</span>Map</button>
+      <button class="nav-btn" data-tab="career"><span>💼</span>Career</button>
+      <button class="nav-btn" data-tab="bank"><span>🏦</span>Bank</button>
+      <button class="nav-btn" data-tab="settings"><span>⚙️</span>Settings</button>
+    </nav>
+  </div>
+
+  <!-- STARTING LOAN (forced) -->
+  <div id="loan-screen" class="overlay hidden">
+    <div class="sheet intro">
+      <div class="intro-hero" aria-hidden="true">🏦</div>
+      <p class="intro-kicker">LANDLORD EMPIRE</p>
+      <h1>Every empire starts with a loan</h1>
+      <p class="intro-sub">The city is hidden in the clouds. Take your first loan to clear the fog over Rustbelt Row and buy your first property.</p>
+      <div class="intro-steps" aria-label="How it works">
+        <span><b>1</b> 🏦 Borrow</span><span>→</span><span><b>2</b> 🏠 Buy</span><span>→</span><span><b>3</b> 💰 Collect rent</span>
+      </div>
+      <span class="intro-bonus hidden" id="intro-bonus"></span>
+      <p class="intro-pick">CHOOSE YOUR STARTING LOAN</p>
+      <div id="loan-options"></div>
+    </div>
+  </div>
+
+  <!-- OFFLINE EARNINGS -->
+  <div id="offline-modal" class="overlay hidden">
+    <div class="sheet">
+      <h1>Welcome back</h1>
+      <p id="offline-text" class="muted"></p>
+      <button class="btn" id="offline-close">Collect</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER: shown only when the bank has seized everything and you still owe money -->
+  <div id="gameover-modal" class="overlay danger-bg hidden" role="alertdialog" aria-labelledby="bk-title">
+    <div class="sheet bankrupt">
+      <div class="bk-siren">🚨</div>
+      <p class="bk-kicker">GAME OVER</p>
+      <h1 class="bk-title" id="bk-title">BANKRUPT</h1>
+      <p class="bk-sub">The bank seized every property you owned and you still owe money. Your empire is gone. 📉</p>
+      <div class="bk-grid" id="gameover-stats"></div>
+      <p class="bk-note" id="gameover-note"></p>
+      <button class="btn bk-btn" id="restart-btn">🔄 Start over</button>
+    </div>
+  </div>
+
+  <!-- BUY CONFIRMATION (opened by tapping a For Sale pin) -->
+  <div id="buy-modal" class="overlay dock hidden">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h1 id="buy-title"></h1>
+        <button class="close-btn" id="buy-close" aria-label="Close">✕</button>
+      </div>
+      <div id="buy-body"></div>
+    </div>
+  </div>
+
+  <!-- PROPERTY MANAGEMENT POPUP (opened by tapping an owned pin) -->
+  <div id="property-modal" class="overlay dock hidden">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h1 id="pm-title"></h1>
+        <button class="close-btn" id="pm-close" aria-label="Close">✕</button>
+      </div>
+      <div id="pm-body"></div>
+    </div>
+  </div>
+
+  <!-- BANK SEIZURE WARNING: stays on top and pauses the game until OK is pressed -->
+  <div id="seize-modal" class="overlay top hidden" role="alertdialog" aria-labelledby="seize-title">
+    <div class="sheet alarm">
+      <div class="big-icon">⚠️</div>
+      <h1 id="seize-title">BANK SEIZURE!</h1>
+      <p id="seize-text"></p>
+      <p class="muted" id="seize-count" style="margin-top:6px"></p>
+      <button class="btn danger" id="seize-ok">OK</button>
+    </div>
+  </div>
+
+  <!-- VICTORY: every property owned, all Luxury, no debt -->
+  <div id="victory-modal" class="overlay hidden">
+    <div class="sheet win">
+      <div class="big-icon">🏆</div>
+      <h1>Congratulations!</h1>
+      <p class="muted">You own every property in the city, every one has a Luxury renovation, and you are completely debt free. You are the Landlord Emperor!</p>
+      <div class="stats" id="victory-stats"></div>
+      <button class="btn" id="ngplus-btn">Start New Game Plus</button>
+      <button class="btn ghost" id="victory-close">Keep playing</button>
+    </div>
+  </div>
+
+  <!-- PRESTIGE CONFIRMATION -->
+  <div id="prestige-modal" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h1>⭐ Prestige</h1>
+        <button class="close-btn" id="prestige-close" aria-label="Close">✕</button>
+      </div>
+      <p><strong>This will reset your progress, but you will gain a permanent income multiplier based on your current net worth.</strong></p>
+      <div class="stats" id="prestige-stats"></div>
+      <button class="btn" id="prestige-confirm">Prestige and restart</button>
+      <button class="btn ghost" id="prestige-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- BREAKDOWN ALERT: drops down from the top while a property is broken -->
+  <div id="alert-banner" class="alert" role="alert"><span id="alert-text"></span><button id="alert-fix" class="alert-btn">Fix now</button></div>
+
+  <div id="error-banner" class="hidden"></div>
+  <script>
+    // Shows any script error on screen, so a white screen always explains itself.
+    window.addEventListener('error', function (e) {
+      var b = document.getElementById('error-banner');
+      b.textContent = 'Error: ' + e.message + ' (' + String(e.filename || '').split('/').pop() + ':' + e.lineno + ')';
+      b.classList.remove('hidden');
+    });
+  </script>
+  <script>
+'use strict';
+
+/* ============================================================
+   1. CONFIG & STATIC DATA
+   ============================================================ */
+const GAME_VERSION = 22;
+
+const CONFIG = {
+  SAVE_KEY: 'landlordEmpire_save_v2',
+  TICK_MS: 30000,            // one game month: rent and loan payments happen once per month
+  MAX_OFFLINE_MS: 4 * 60 * 60 * 1000,   // offline progress is capped at 4 hours (hard limit)
+  UI_REFRESH_MS: 250,
+  AUTOSAVE_MS: 10000,
+  LOAN_TERM_CYCLES: 100,      // a loan is repaid over 100 cycles (50 minutes): heavy payments
+  MAX_LOANS: 2,               // at most 2 active loans at a time
+  BREAKDOWN_CHANCE: 0.05,     // per rented property, per live cycle
+  MARKET_SWING: 0.1,          // for-sale prices move +/-10% every cycle
+  BREAK_ALERT_MS: 5000,       // the breakdown banner hides itself after 5 seconds
+  CHART_EVERY: 2,             // chart gets a new point every 2 cycles
+  CHART_POINTS: 60,
+  FOG_PAN_MS: 700,            // the camera reaches a newly unlocked district before its clouds start to move
+  FOG_CLEAR_MS: 3200,         // clouds are removed by this time at the latest, even if an animation event was missed
+  PRESTIGE_KEY: 'landlordEmpire_prestige',   // kept apart from the save, so it survives every reset
+  PRESTIGE_MAX: 1.5,          // the best possible rent multiplier
+  DEV_PASSWORD: 'otis',
+};
+
+// rate = total interest added to the loan, repaid in equal installments every cycle.
+// Credit rule: you can take a loan if your property value is at least minAssets
+// OR you have fully paid off at least minPaidOff loans before.
+const LOAN_OPTIONS = [
+  { id: 'family',   icon: '👪', name: 'Family loan',     amount: 30000,  rate: 0.08, minAssets: 0,      minPaidOff: 0, desc: 'Smallest and cheapest.' },
+  { id: 'bank',     icon: '🏦', name: 'Community bank',  amount: 60000,  rate: 0.15, minAssets: 0,      minPaidOff: 0, desc: 'A bigger start, heavier payments.' },
+  { id: 'investor', icon: '💼', name: 'Investor credit', amount: 120000, rate: 0.25, minAssets: 150000, minPaidOff: 1, desc: 'Needs a track record.' },
+];
+
+// Base size of the map: 1376 x 768, the size of assets/map.jpg, map_night.png and every cloud picture (matches .map-world in the CSS).
+// UI.fitWorld() scales WORLD up evenly when the screen is taller, so the map always fills the Map tab.
+const BASE_WORLD = { w: 1376, h: 768 };
+const WORLD = { ...BASE_WORLD };
+
+// poly = the district's area on the map, as [x, y] corners in % of the map (0,0 = top-left, 100,100 = bottom-right).
+// It is never drawn: its center is where the camera pans on unlock and where the lock label sits.
+// unlockAt = properties owned to open it. Rustbelt Row (0) opens when the first loan is taken.
+// cloud = the fog picture covering the district while it is locked (assets/cloud_N.png).
+// fogZ = stacking order of the fog pictures. Isometric view: the further south (lower on the map), the later the
+// picture is drawn, so Skyline Crown (top) is at the bottom of the stack and Rustbelt Row (bottom) on top.
+const DISTRICTS = [
+  { id: 'rustbelt', name: 'Rustbelt Row',   unlockAt: 0,  cloud: 1, fogZ: 50, poly: [[17, 71], [50, 69], [74, 72], [76, 94], [45, 96], [14, 93]] },   // industrial, bottom
+  { id: 'maple',    name: 'Maple Heights',  unlockAt: 3,  cloud: 2, fogZ: 30, poly: [[6, 37], [33, 35], [35, 50], [34, 64], [8, 65], [4, 52]] },      // suburbs, mid-left
+  { id: 'midtown',  name: 'Midtown',        unlockAt: 7,  cloud: 3, fogZ: 40, poly: [[37, 42], [63, 40], [65, 55], [63, 70], [38, 70], [36, 56]] },   // city center, middle
+  { id: 'harbor',   name: 'Harbor Quarter', unlockAt: 11, cloud: 4, fogZ: 20, poly: [[71, 37], [97, 35], [99, 50], [97, 65], [72, 64], [69, 50]] },   // waterfront, mid-right
+  { id: 'skyline',  name: 'Skyline Crown',  unlockAt: 15, cloud: 5, fogZ: 10, poly: [[27, 5], [73, 3], [76, 18], [72, 33], [28, 33], [24, 18]] },     // skyscrapers, top
+];
+const zoneCenter = (d) => d.poly.reduce((c, [x, y]) => [c[0] + x / d.poly.length, c[1] + y / d.poly.length], [0, 0]);
+
+// Every property and its pin position.
+// x = across the map (0 = left edge, 100 = right edge), y = down the map (0 = top, 100 = bottom).
+// The pin's tip sits exactly on (x, y), so to move a pin just change these two numbers.
+const BUILDINGS = [
+  // rustbelt
+  { id: 'r1', zone: 'rustbelt', name: 'Tannery Flats',  x: 22, y: 80, price: 18000, rent: 220, repairLabel: 'Fix plumbing',           repairCost: 4000 },
+  { id: 'r2', zone: 'rustbelt', name: 'Mill St Duplex', x: 40, y: 86, price: 24000, rent: 300, repairLabel: 'Replace flooring',       repairCost: 5000 },
+  { id: 'r3', zone: 'rustbelt', name: 'Bakery Loft',    x: 55, y: 78, price: 15000, rent: 190, repairLabel: 'Rewire electrics',       repairCost: 3500 },
+  { id: 'r4', zone: 'rustbelt', name: 'Depot Row',      x: 68, y: 88, price: 32000, rent: 420, repairLabel: 'Repaint and patch roof', repairCost: 7000 },
+  // maple
+  { id: 'maple-1', zone: 'maple', name: 'Linden Court',   x: 12, y: 43, price: 60000,   rent: 750,  repairLabel: 'Fix plumbing',     repairCost: 13000 },
+  { id: 'maple-2', zone: 'maple', name: 'Maple Terrace',  x: 27, y: 45, price: 78000,   rent: 980,  repairLabel: 'Replace flooring', repairCost: 17000 },
+  { id: 'maple-3', zone: 'maple', name: 'Orchard Villas', x: 14, y: 57, price: 99000,   rent: 1240, repairLabel: 'Rewire electrics', repairCost: 22000 },
+  { id: 'maple-4', zone: 'maple', name: 'Parkgate Homes', x: 28, y: 59, price: 126000,  rent: 1580, repairLabel: 'Renovate roof',    repairCost: 27500 },
+  // midtown
+  { id: 'midtown-1', zone: 'midtown', name: 'Metro Lofts',    x: 42, y: 48, price: 160000,  rent: 2000, repairLabel: 'Fix plumbing',     repairCost: 35000 },
+  { id: 'midtown-2', zone: 'midtown', name: 'Bank St Flats',  x: 57, y: 50, price: 208000,  rent: 2600, repairLabel: 'Replace flooring', repairCost: 46000 },
+  { id: 'midtown-3', zone: 'midtown', name: 'Theatre Row',    x: 44, y: 62, price: 264000,  rent: 3300, repairLabel: 'Rewire electrics', repairCost: 58000 },
+  { id: 'midtown-4', zone: 'midtown', name: 'Civic Suites',   x: 58, y: 63, price: 336000,  rent: 4200, repairLabel: 'Renovate roof',    repairCost: 74000 },
+  // harbor
+  { id: 'harbor-1', zone: 'harbor', name: 'Pier Homes',     x: 78, y: 44, price: 400000,  rent: 5000, repairLabel: 'Fix plumbing',     repairCost: 88000 },
+  { id: 'harbor-2', zone: 'harbor', name: 'Beacon Flats',   x: 92, y: 46, price: 520000,  rent: 6500, repairLabel: 'Replace flooring', repairCost: 114500 },
+  { id: 'harbor-3', zone: 'harbor', name: 'Marina Lofts',   x: 80, y: 57, price: 660000,  rent: 8250, repairLabel: 'Rewire electrics', repairCost: 145000 },
+  { id: 'harbor-4', zone: 'harbor', name: 'Quay Towers',    x: 93, y: 59, price: 840000,  rent: 10500, repairLabel: 'Renovate roof',    repairCost: 185000 },
+  // skyline
+  { id: 'skyline-1', zone: 'skyline', name: 'Crown Suites',   x: 33, y: 16, price: 1000000, rent: 12500, repairLabel: 'Fix plumbing',     repairCost: 220000 },
+  { id: 'skyline-2', zone: 'skyline', name: 'Sky Gardens',    x: 48, y: 13, price: 1300000, rent: 16250, repairLabel: 'Replace flooring', repairCost: 286000 },
+  { id: 'skyline-3', zone: 'skyline', name: 'Apex Tower',     x: 62, y: 21, price: 1650000, rent: 20630, repairLabel: 'Rewire electrics', repairCost: 363000 },
+  { id: 'skyline-4', zone: 'skyline', name: 'Regent Hall',    x: 54, y: 28, price: 2100000, rent: 26250, repairLabel: 'Renovate roof',    repairCost: 462000 },
+];
+
+// Renovation styles: pct = total cost as a share of the purchase price, bonus = permanent rent increase.
+const RENO = [
+  { name: 'None',   pct: 0,    bonus: 0 },
+  { name: 'Modern', pct: 0.15, bonus: 0.25 },
+  { name: 'Luxury', pct: 0.35, bonus: 0.6 },
+];
+
+// Education: pay `cost` (High School is free), then wait `secs` real seconds.
+// Ordered from the cheapest degree to the most expensive, matching the career it opens (lowest to highest pay).
+const DEGREES = [
+  { id: 'highschool',   name: 'High School Diploma', icon: '🎒', cost: 0,      secs: 20,  needs: null },
+  { id: 'management',   name: 'Management Degree',   icon: '📊', cost: 10000,  secs: 40,  needs: 'highschool' },
+  { id: 'arts',         name: 'Arts Degree',         icon: '🎭', cost: 15000,  secs: 45,  needs: 'highschool' },
+  { id: 'law',          name: 'Law Degree',          icon: '📚', cost: 30000,  secs: 75,  needs: 'highschool' },
+  { id: 'architecture', name: 'Architecture Degree', icon: '🏛️', cost: 80000,  secs: 120, needs: 'highschool' },
+  { id: 'medical',      name: 'Medical Degree',      icon: '⚕️', cost: 150000, secs: 180, needs: 'highschool' },
+];
+
+// Career paths, from the lowest paying to the highest paying. Each path has promotion tiers: pay = cash per Work tap.
+// taps = how many Work taps you need in this tier before you can be promoted to the next one (promotions are free).
+// needs = degree required to switch to the path.
+const CAREERS = [
+  { id: 'retail', name: 'Retail & Service', icon: '🛒', needs: null, tiers: [
+    { name: 'Cleaner',            icon: '🧹', pay: 8,   taps: 30 },
+    { name: 'Fastfood Worker',    icon: '🍔', pay: 15,  taps: 60 },
+    { name: 'Shop Assistant',     icon: '🛍️', pay: 30,  taps: 100 },
+    { name: 'Sales Agent',        icon: '🤝', pay: 60,  taps: 0 },
+  ] },
+  { id: 'business', name: 'Business', icon: '💼', needs: 'management', tiers: [
+    { name: 'Office Associate',   icon: '📎', pay: 70,  taps: 40 },
+    { name: 'Sales Executive',    icon: '📈', pay: 130, taps: 80 },
+    { name: 'Department Manager', icon: '🗂️', pay: 240, taps: 140 },
+    { name: 'Corporate Director', icon: '🏢', pay: 420, taps: 0 },
+  ] },
+  { id: 'arts', name: 'Arts & Design', icon: '🎨', needs: 'arts', tiers: [
+    { name: 'Street Painter',     icon: '🖍️', pay: 90,  taps: 50 },
+    { name: 'Studio Painter',     icon: '🖌️', pay: 180, taps: 100 },
+    { name: 'Gallery Artist',     icon: '🖼️', pay: 350, taps: 160 },
+    { name: 'Master Artist',      icon: '👑', pay: 650, taps: 0 },
+  ] },
+  { id: 'law', name: 'Law', icon: '⚖️', needs: 'law', tiers: [
+    { name: 'Paralegal',          icon: '📋', pay: 110, taps: 60 },
+    { name: 'Associate Lawyer',   icon: '📜', pay: 220, taps: 110 },
+    { name: 'Lawyer',             icon: '⚖️', pay: 420, taps: 180 },
+    { name: 'Judge',              icon: '🧑‍⚖️', pay: 800, taps: 0 },
+  ] },
+  { id: 'architecture', name: 'Architecture', icon: '📐', needs: 'architecture', tiers: [
+    { name: 'Draftsman',          icon: '✏️', pay: 150, taps: 50 },
+    { name: 'Junior Architect',   icon: '📐', pay: 300, taps: 100 },
+    { name: 'Urban Planner',      icon: '🏗️', pay: 600, taps: 200 },
+    { name: 'Chief Architect',    icon: '🏛️', pay: 1000, taps: 0 },
+  ] },
+  { id: 'medicine', name: 'Medicine', icon: '🩺', needs: 'medical', tiers: [
+    { name: 'Intern',             icon: '🩺', pay: 200, taps: 60 },
+    { name: 'Resident',           icon: '💉', pay: 400, taps: 120 },
+    { name: 'Attending',          icon: '🏥', pay: 800, taps: 220 },
+    { name: 'Chief of Surgery',   icon: '⚕️', pay: 1400, taps: 0 },
+  ] },
+];
+
+const STATUS = { repair: 'Needs repair', ready: 'Ready to rent', rented: 'Rented', broken: 'Broken' };
+// Each district has its own pin icon. The pin's color shows the property's status.
+const DISTRICT_ICON = { rustbelt: '🏚️', maple: '🏠', midtown: '🏢', harbor: '🏨', skyline: '🏙️' };
+
+/* ============================================================
+   2. STATE & SAVE MANAGER
+   ============================================================ */
+const newState = () => ({
+  version: 2,
+  hasStarted: false,        // false until the first loan is taken
+  lightMode: true,
+  audioOn: false,           // sound stays muted until the player turns it on
+  vibrationsEnabled: true,  // haptic feedback (navigator.vibrate) on supporting phones
+  musicVol: 0.5,            // 0..1, set with the slider in Settings
+  sfxVol: 0.8,
+  victoryShown: false,      // the Congratulations screen appears only once per run
+  cash: 0,
+  loans: [],                // { id, name, principal, balance, rate, payment }
+  properties: [],           // see Game.act('buy') for the fields
+  unlockedDistricts: [],     // the whole map starts under clouds; the first loan opens Rustbelt Row
+  career: { path: 'retail', tiers: { retail: 0 }, taps: {}, totalTaps: 0, degrees: [], study: null },
+  lastTick: Date.now(),
+  months: 0,                // game months passed in this run (one per 30 s tick), shown as "Year 1 · Month 1" in the HUD
+  history: [],              // chart points: { cash, debt }
+  market: {},               // price multiplier of each building for sale (changes every cycle)
+  stats: { totalRent: 0, ticks: 0, loanPaid: 0, breakdowns: 0, loansPaidOff: 0, seized: 0, peakWorth: 0 },
+});
+
+const SaveManager = {
+  load() {
+    try {
+      const raw = localStorage.getItem(CONFIG.SAVE_KEY);
+      if (!raw) return null;
+      const saved = JSON.parse(raw), base = newState();
+      const career = { ...base.career, ...saved.career };
+      delete career.job;    // left over from the old job ladder
+      delete career.held;
+      const state = { ...base, ...saved, career, stats: { ...base.stats, ...saved.stats } };
+      if (saved.months === undefined) state.months = state.stats.ticks || 0;   // saves from before the calendar
+      return state;
+    } catch (err) {
+      console.warn('Could not read save, starting fresh.', err);
+      return null;
+    }
+  },
+  save(state) {
+    try { localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(state)); }
+    catch (err) { console.warn('Could not save.', err); }
+  },
+  wipe() { localStorage.removeItem(CONFIG.SAVE_KEY); },
+};
+
+/* ============================================================
+   3. HELPERS
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const fmtMoney = (n) => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const fmtShort = (n) => (Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : Math.abs(n) >= 1000 ? Math.round(n / 1000) + 'k' : String(Math.round(n)));
+// Month counter -> calendar date: 0 months passed = Year 1, Month 1.
+const fmtDate = (months) => `Year ${Math.floor(months / 12) + 1} · Month ${(months % 12) + 1}`;
+function fmtDuration(ms) {
+  const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
+  if (h > 0) return `${h}h ${m % 60}m`;
+  return m > 0 ? `${m}m` : `${Math.floor(ms / 1000)}s`;
+}
+const tenantRent = (base, kind) => Math.round(base * (kind === 'premium' ? 1.5 : 1));
+const findBuilding = (id) => BUILDINGS.find((b) => b.id === id);
+const findProp = (s, id) => s.properties.find((p) => p.id === id);
+const totalDebt = (s) => s.loans.reduce((a, l) => a + l.balance, 0);
+const baseRentOf = (p) => Math.round(p.origRent * (1 + RENO[p.reno].bonus));
+const offerOf = (p) => Math.round((p.buyPrice + p.repairCost + p.renoSpent) * p.market);   // what the market pays today
+const renoCost = (p, level) => Math.round((RENO[level].pct * p.buyPrice) / 100) * 100 - p.renoSpent;
+const statusKey = (p) => (p.broken ? 'broken' : p.status);
+const pinKey = (s, id) => { const p = findProp(s, id); return p ? statusKey(p) : 'sale'; };
+const priceOf = (s, b) => Math.round((b.price * (s.market[b.id] || 1)) / 10) * 10;                      // today's price of a building for sale
+const assetsOf = (s) => s.properties.reduce((sum, p) => sum + p.buyPrice + p.repairCost + p.renoSpent, 0);   // total property value
+const loanCheck = (s, o) => assetsOf(s) >= o.minAssets || s.stats.loansPaidOff >= o.minPaidOff;            // credit rule
+const fixCostOf = (p) => Math.max(500, Math.round((p.repairCost * 0.4) / 100) * 100);                     // price to fix a breakdown
+const loanTotalOf = (l) => Math.round(l.principal * (1 + l.rate));                                         // principal + interest
+const netWorthOf = (s) => s.cash + assetsOf(s) - totalDebt(s);
+const loanIcon = (l) => (LOAN_OPTIONS.find((o) => o.name === l.name) || { icon: '🏦' }).icon;
+// A freshly bought property: it always needs its first repair before it can be rented.
+const newProperty = (b, price) => ({ id: b.id, buyPrice: price, origRent: b.rent, baseRent: b.rent, repairLabel: b.repairLabel,
+  repairCost: b.repairCost, status: 'repair', tenant: null, rent: 0, broken: false, fixCost: 0, reno: 0, renoSpent: 0, market: 1 });
+
+/* ============================================================
+   3a. ENDGAME & PRESTIGE
+   ============================================================ */
+const MAX_RENO = RENO.length - 1;
+// Net worth of a finished game: every building bought at list price, repaired and fully Luxury, no cash, no debt.
+const ENDGAME_NET_WORTH = BUILDINGS.reduce((sum, b) => sum + b.price * (1 + RENO[MAX_RENO].pct) + b.repairCost, 0);
+
+// Victory: every property owned, every one fully Luxury, and no debt left.
+const isVictory = (s) => s.properties.length === BUILDINGS.length
+  && s.properties.every((p) => p.reno === MAX_RENO) && totalDebt(s) === 0;
+
+// Prestige multiplier earned by a net worth: x1.00 at $0, rising in a straight line to x1.50 at the endgame net worth.
+const prestigeFor = (s) => {
+  const share = Math.min(1, Math.max(0, netWorthOf(s) / ENDGAME_NET_WORTH));
+  return Math.round((1 + (CONFIG.PRESTIGE_MAX - 1) * share) * 100) / 100;
+};
+
+// Stored under its own localStorage key, so erasing the save or going bankrupt never removes it.
+const Prestige = {
+  data: { multiplier: 1, count: 0 },
+  load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(CONFIG.PRESTIGE_KEY));
+      if (d && d.multiplier >= 1) this.data = { multiplier: Math.min(CONFIG.PRESTIGE_MAX, d.multiplier), count: d.count || 0 };
+    } catch (err) { console.warn('Could not read prestige data.', err); }
+  },
+  save() {
+    try { localStorage.setItem(CONFIG.PRESTIGE_KEY, JSON.stringify(this.data)); }
+    catch (err) { console.warn('Could not save prestige data.', err); }
+  },
+  get mult() { return this.data.multiplier; },
+};
+
+/* ============================================================
+   3b. SOUND  (music + sound effects, files live in assets/audio/)
+   ============================================================ */
+const Sound = {
+  muted: true,          // muted by default: browsers block sound until the player has tapped something
+  bgm: null,
+  sfx: {},
+  musicVol: 0.5,
+  sfxVol: 0.8,
+  names: ['cash_in', 'cash_out', 'broken', 'repair', 'click', 'achievement', 'gameover', 'victory', 'alert'],
+
+  init(audioOn, musicVol, sfxVol) {
+    this.bgm = new Audio('assets/audio/bgm.mp3');
+    this.bgm.loop = true;
+    this.setVolumes(musicVol, sfxVol);
+    this.names.forEach((n) => {
+      const a = new Audio(`assets/audio/${n}.mp3`);
+      a.preload = 'auto';
+      this.sfx[n] = a;
+    });
+    this.muted = !audioOn;
+    // If sound was left on last time, the music can only start after the first tap.
+    document.addEventListener('pointerdown', () => this.startMusic(), { once: true });
+  },
+
+  halted: false,        // true after game over: coming back to the app must not restart the music
+  startMusic() {
+    this.halted = false;
+    if (!this.muted && this.bgm.paused) this.bgm.play().catch(() => {});
+  },
+
+  // Music volume applies to the playing track at once; SFX volume applies to every sound played after this.
+  setVolumes(music, sfx) {
+    this.musicVol = music;
+    this.sfxVol = sfx;
+    this.bgm.volume = music;
+  },
+
+  stopMusic() { this.halted = true; if (this.bgm) this.bgm.pause(); },
+
+  setMuted(m) {
+    this.muted = m;
+    if (m) this.bgm.pause();
+    else this.startMusic();
+  },
+
+  // Plays one sound effect (a fresh copy, so quick repeats can overlap). Does nothing while muted.
+  play(name) {
+    if (this.muted || !this.sfx[name]) return;
+    const a = this.sfx[name].cloneNode();
+    a.volume = this.sfxVol * (name === 'click' ? 0.6 : 1);
+    a.play().catch(() => {});
+  },
+};
+
+/* ============================================================
+   3c. HAPTICS  (plain Web Vibration API: navigator.vibrate)
+   ============================================================ */
+// No plugins and no imports: only the standard navigator.vibrate, wrapped so it can never throw.
+const Haptics = {
+  vibrationsEnabled: true,
+  LIGHT: 50,      // taps, buying, working
+  MEDIUM: 300,    // warnings: breakdown, bank seizure
+  HEAVY: 1000,    // game over
+
+  supported() { return typeof navigator !== 'undefined' && !!navigator.vibrate; },
+
+  buzz(ms) {
+    if (this.vibrationsEnabled !== true) return;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) { navigator.vibrate(ms); }
+    } catch (err) {
+      // vibration blocked or unsupported: ignore, the game carries on
+    }
+  },
+  light() { this.buzz(this.LIGHT); },
+  medium() { this.buzz(this.MEDIUM); },
+  heavy() { this.buzz(this.HEAVY); },
+};
+
+/* ============================================================
+   4. ENGINE  (game rules; no DOM access)
+   ============================================================ */
+const Engine = {
+  // Rent earned in one cycle, prestige bonus included. Broken or unrented properties pay $0.
+  tickIncome(s) {
+    const base = s.properties.reduce((sum, p) => sum + (p.status === 'rented' && !p.broken ? p.rent : 0), 0);
+    return Math.round(base * Prestige.mult);   // the prestige bonus applies to all rent
+  },
+
+  // Deducts every loan installment (interest + principal). Cash may drop below $0 here;
+  // seizeAssets() then fixes that right away.
+  payLoans(s) {
+    const due = s.loans.reduce((a, l) => a + Math.min(l.payment, l.balance), 0);
+    if (due > 0) {
+      s.cash -= due;
+      s.stats.loanPaid += due;
+      s.loans.forEach((l) => { l.balance -= Math.min(l.payment, l.balance); });
+      const before = s.loans.length;
+      s.loans = s.loans.filter((l) => l.balance > 0);
+      s.stats.loansPaidOff += before - s.loans.length;
+    }
+    return due;
+  },
+
+  // Asset seizure: if cash is below $0 after the loan payment, the bank sells your cheapest
+  // property at its current market value, again and again, until cash is $0 or more.
+  // Only when no property is left and cash is STILL below $0 is it real bankruptcy.
+  seizeAssets(s, log) {
+    while (s.cash < 0 && s.properties.length > 0) {
+      const cheapest = s.properties.reduce((a, b) => (offerOf(b) < offerOf(a) ? b : a));
+      s.cash += offerOf(cheapest);
+      s.properties = s.properties.filter((p) => p.id !== cheapest.id);
+      log.seized.push(findBuilding(cheapest.id).name);
+      s.stats.seized += 1;
+    }
+    if (s.cash < 0) s.bankrupt = true;
+  },
+
+  // Each rented, working property has a small chance to break down.
+  rollBreakdowns(s) {
+    let n = 0;
+    for (const p of s.properties) {
+      if (p.status === 'rented' && !p.broken && Math.random() < CONFIG.BREAKDOWN_CHANCE) {
+        p.broken = true;
+        p.fixCost = fixCostOf(p);
+        n++;
+      }
+    }
+    s.stats.breakdowns += n;
+    return n;
+  },
+
+  // Adds a chart point (or, with replaceLast, refreshes the newest one).
+  record(s, replaceLast) {
+    const point = { cash: s.cash, debt: totalDebt(s) };
+    if (replaceLast && s.history.length) s.history[s.history.length - 1] = point;
+    else s.history.push(point);
+    if (s.history.length > CONFIG.CHART_POINTS) s.history.shift();
+    s.stats.peakWorth = Math.max(s.stats.peakWorth || 0, netWorthOf(s));   // shown on the bankruptcy screen
+  },
+
+  // One 30s tick = one game month. `live` is false while catching up on time the game was closed
+  // (nothing breaks while you're away).
+  processTick(s, live, log) {
+    const rent = this.tickIncome(s);
+    s.cash += rent;
+    s.stats.totalRent += rent;
+    s.stats.ticks += 1;
+    s.months += 1;   // one tick = one game month
+    this.payLoans(s);
+    s.properties.forEach((p) => { p.market = 0.9 + Math.random() * 0.25; });   // sell offer: -10% .. +15%
+    BUILDINGS.forEach((b) => {                                                  // for-sale prices move +/-10%
+      if (!findProp(s, b.id)) s.market[b.id] = 1 + (Math.random() * 2 - 1) * CONFIG.MARKET_SWING;
+    });
+    this.seizeAssets(s, log);                                                   // the bank sells properties if cash < 0
+    if (live) this.rollBreakdowns(s);
+    if (s.stats.ticks % CONFIG.CHART_EVERY === 0) this.record(s, false);
+    return rent;
+  },
+
+  // Runs every cycle elapsed since s.lastTick (live play and offline catch-up).
+  advance(s, now) {
+    if (s.lastTick > now) s.lastTick = now;
+    const due = Math.floor((now - s.lastTick) / CONFIG.TICK_MS);
+    if (due <= 0) return null;
+
+    const maxTicks = Math.floor(CONFIG.MAX_OFFLINE_MS / CONFIG.TICK_MS);   // 4 hours: nothing is earned after this
+    const ticks = Math.min(due, maxTicks);
+    const before = { ...s.stats };
+    const log = { seized: [] };   // names of the properties the bank seized
+    let earned = 0;
+    for (let i = 0; i < ticks && !s.bankrupt; i++) earned += this.processTick(s, due === 1, log);
+
+    s.lastTick += due * CONFIG.TICK_MS;
+    return { ticks, earned, capped: due > maxTicks,
+      paid: s.stats.loanPaid - before.loanPaid, breaks: s.stats.breakdowns - before.breakdowns, seized: log.seized };
+  },
+
+  msToNextTick(s, now) { return CONFIG.TICK_MS - (now - s.lastTick); },
+};
+
+/* ============================================================
+   5. UI  (all DOM work)
+   ============================================================ */
+const UI = {
+  district: 'rustbelt',   // district the map centers on when the game starts
+  building: null,         // pin selected on the map
+  openId: null,           // property open in the popup
+  buyId: null,            // property open in the buy popup
+  mapPos: null,           // remembered map scroll position
+  justDragged: false,     // true right after a mouse drag, so the drag doesn't count as a pin tap
+  alertTimer: null,       // hides the breakdown banner after 5 seconds
+  toastTimer: null,
+  seizeQueue: [],         // names of seized properties still waiting to be shown in the seizure popup
+  unlocking: {},          // district id -> the cloud picture whose unlock animation is running (it can't be started twice)
+  devUnlocked: false,     // the developer menu stays unlocked until the page is reloaded
+
+  init() {
+    document.querySelectorAll('.nav-btn').forEach((btn) =>
+      btn.addEventListener('click', () => this.showTab(btn.dataset.tab)));
+
+    window.addEventListener('resize', () => { this.fitWorld(); this.dock(); });
+
+    // Tap a pin: the map pans so the pin sits above the popup, and the buy or management popup opens.
+    $('map-pins').addEventListener('click', (e) => {
+      const pin = e.target.closest('.pin');
+      if (!pin || this.justDragged) return;
+      const b = findBuilding(pin.dataset.id);
+      this.building = b.id;
+      if (findProp(Game.state, b.id)) this.openProperty(b.id);
+      else this.openBuy(b.id);
+      // The map window now ends where the sheet begins, so 0.6 of its height = the pin (head and tip) in the
+      // middle of the visible top part of the screen. panTo never goes past the map's edges.
+      this.panTo(b.x, b.y, 0.6);
+      this.renderMap(Game.state);
+    });
+
+    // Drag-to-pan: press and drag (mouse or finger) to move the map. The map has no scrollbars.
+    const sc = $('map-scroll');
+    let drag = null;
+    sc.addEventListener('pointerdown', (e) => {
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: sc.scrollLeft, top: sc.scrollTop, moved: false };
+    });
+    sc.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) > 6) {
+        drag.moved = true;
+        sc.classList.add('dragging');
+        sc.setPointerCapture(e.pointerId);
+      }
+      if (drag.moved) { sc.scrollLeft = drag.left - dx; sc.scrollTop = drag.top - dy; }
+    });
+    const endDrag = () => {
+      if (drag && drag.moved) { this.justDragged = true; setTimeout(() => { this.justDragged = false; }, 0); }
+      drag = null;
+      sc.classList.remove('dragging');
+    };
+    sc.addEventListener('pointerup', endDrag);
+    sc.addEventListener('pointercancel', endDrag);
+
+    $('buy-close').addEventListener('click', () => this.closeBuy());
+    $('buy-modal').addEventListener('click', (e) => { if (e.target === $('buy-modal')) this.closeBuy(); });
+
+    // Every button with a data-act attribute (Buy, Repair, Rent, Work, Study...) is handled here.
+    document.body.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.dataset.act === 'work' && e.detail !== 0) return;   // taps on Work are handled on pointerdown below
+      Game.act(b.dataset.act, b.dataset.id, b.dataset.arg);
+    });
+
+    // Loan cards appear on the start screen and in the Bank tab (see renderLoanCards).
+    ['loan-options', 'new-loans'].forEach((id) => {
+      $(id).addEventListener('click', (e) => {
+        const card = e.target.closest('.loan-card');
+        if (card) Game.borrow(card.dataset.id);
+      });
+    });
+
+    // Bank payments: custom amount (Max fills in the most you can pay), per-loan and pay-all buttons use data-act.
+    $('pay-btn').addEventListener('click', () => Game.payEarly($('pay-amount').value));
+    $('pay-amount').addEventListener('keydown', (e) => { if (e.key === 'Enter') Game.payEarly($('pay-amount').value); });
+    // Quick amounts: a share of the most you can pay right now (your cash, capped at your total debt).
+    $('pay-quick').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pct]'), s = Game.state;
+      if (!b) return;
+      $('pay-amount').value = Math.max(0, Math.floor(Math.min(s.cash, totalDebt(s)) * Number(b.dataset.pct)));
+    });
+
+    $('theme-btn').addEventListener('click', () => Game.toggleTheme());
+    $('audio-btn').addEventListener('click', () => Game.toggleAudio());
+    $('vibe-btn').addEventListener('click', () => Game.toggleVibration());
+    $('music-vol').addEventListener('input', (e) => Game.setVolume('music', e.target.value));
+    $('sfx-vol').addEventListener('input', (e) => Game.setVolume('sfx', e.target.value));
+    ['music-vol', 'sfx-vol'].forEach((id) => $(id).addEventListener('change', () => SaveManager.save(Game.state)));
+
+    // Developer menu: password first, then the tools.
+    $('dev-login-btn').addEventListener('click', () => this.devLogin());
+    $('dev-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.devLogin(); });
+    $('dev-lock-btn').addEventListener('click', () => this.setDevUnlocked(false));
+    $('dev-cash-btn').addEventListener('click', () => Game.addCash(100000));
+    $('dev-cash-btn-1m').addEventListener('click', () => Game.addCash(1000000));
+    $('dev-degrees-btn').addEventListener('click', () => Game.devUnlockDegrees());
+    $('dev-debt-btn').addEventListener('click', () => Game.devClearDebt());
+    $('dev-break-btn').addEventListener('click', () => Game.devBreakdown());
+    $('dev-buyall-btn').addEventListener('click', () => Game.devBuyAll());
+    $('dev-repairall-btn').addEventListener('click', () => Game.devRepairAll());
+
+    // Seizure popup: OK shows the next seized property, or closes and resumes the game.
+    $('seize-ok').addEventListener('click', () => this.nextSeizure());
+
+    // Prestige and victory.
+    $('prestige-btn').addEventListener('click', () => this.openPrestige());
+    ['prestige-close', 'prestige-cancel'].forEach((id) => $(id).addEventListener('click', () => $('prestige-modal').classList.add('hidden')));
+    $('prestige-confirm').addEventListener('click', () => Game.prestige());
+    $('ngplus-btn').addEventListener('click', () => Game.prestige());
+    $('victory-close').addEventListener('click', () => $('victory-modal').classList.add('hidden'));
+    $('restart-btn').addEventListener('click', () => Game.reset());
+    // Every button press plays the click sound.
+    // Work button: every finger touch counts at once (multi-touch included), with no delay.
+    $('career-root').addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('#work-btn') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      e.preventDefault();   // no text selection / long-press menu while spamming
+      Game.work();
+    });
+    // Every other button press plays the click sound and a light vibration (Work does its own, once per tap).
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b || (b.id === 'work-btn' && e.detail !== 0)) return;
+      Sound.play('click');
+      Haptics.light();
+    });
+    $('alert-fix').addEventListener('click', () => {
+      this.showTab('map');
+      const broken = Game.state.properties.find((p) => p.broken);
+      if (broken) this.openProperty(broken.id);
+    });
+    $('reset-btn').addEventListener('click', () => { if (confirm('Hard reset: erase your save AND your prestige bonus?')) Game.hardReset(); });
+    $('offline-close').addEventListener('click', () => $('offline-modal').classList.add('hidden'));
+    $('pm-close').addEventListener('click', () => this.closeProperty());
+    $('property-modal').addEventListener('click', (e) => { if (e.target === $('property-modal')) this.closeProperty(); });
+
+    $('version').textContent = `Game version ${GAME_VERSION}`;
+  },
+
+  showTab(name) {
+    const sc = $('map-scroll');
+    if ($('view-map').classList.contains('active')) this.mapPos = { left: sc.scrollLeft, top: sc.scrollTop };   // remember the map position
+    document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
+    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    $('app').classList.toggle('map-mode', name === 'map');   // the map tab goes full screen
+    if (name === 'map') {
+      this.fitWorld();
+      if (this.mapPos) { sc.scrollLeft = this.mapPos.left; sc.scrollTop = this.mapPos.top; }
+    }
+  },
+
+  applyTheme(light) {
+    document.body.classList.toggle('light-mode', light);
+    this.applyFogTheme();   // day / night clouds (the map picture switches through --map-img)
+    $('theme-btn').setAttribute('aria-checked', String(!light));
+    $('theme-name').textContent = light ? '☀️ Light mode' : '🌙 Dark mode';
+    $('theme-hint').textContent = `Tap to switch to ${light ? 'dark' : 'light'} mode`;
+    $('theme-knob').textContent = light ? '☀️' : '🌙';
+  },
+
+  showLoanScreen() { $('app').classList.add('hidden'); $('loan-screen').classList.remove('hidden'); },
+  hideLoanScreen() { $('loan-screen').classList.add('hidden'); $('app').classList.remove('hidden'); },
+
+  showOffline(res) {
+    $('offline-text').textContent =
+      `You were away for ${fmtDuration(res.ticks * CONFIG.TICK_MS)}${res.capped ? ` (capped at ${fmtDuration(CONFIG.MAX_OFFLINE_MS)})` : ''}. ` +
+      `${res.ticks} months paid ${fmtMoney(res.earned)} in rent. Loan payments took ${fmtMoney(res.paid)}.` +
+      (res.seized.length ? ` The bank seized ${res.seized.length} ${res.seized.length === 1 ? 'property' : 'properties'} to cover your debts.` : '');
+    $('offline-modal').classList.remove('hidden');
+  },
+
+  toast(msg) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => el.classList.add('hidden'), 3000);
+  },
+
+  bankMsg(msg) { $('bank-msg').textContent = msg; },
+
+  applyAudio(on) { $('audio-btn').textContent = on ? 'Mute audio' : 'Unmute audio'; },
+
+  applyVibration(on) {
+    $('vibe-btn').textContent = `📳 Vibration: ${on ? 'On' : 'Off'}`;
+    if (!Haptics.supported()) $('vibe-note').textContent = 'This device or browser does not support vibration. The setting is saved for the phone app.';
+  },
+
+  applyVolumes(s) {
+    $('music-vol').value = s.musicVol;
+    $('sfx-vol').value = s.sfxVol;
+    $('music-vol-text').textContent = `${Math.round(s.musicVol * 100)}%`;
+    $('sfx-vol-text').textContent = `${Math.round(s.sfxVol * 100)}%`;
+  },
+
+  /* ---------- Developer menu ---------- */
+  devLogin() {
+    const input = $('dev-pass');
+    if (input.value === CONFIG.DEV_PASSWORD) {
+      this.setDevUnlocked(true);
+      $('dev-msg').textContent = '';
+    } else {
+      $('dev-msg').textContent = 'Wrong password.';
+    }
+    input.value = '';
+  },
+
+  setDevUnlocked(on) {
+    this.devUnlocked = on;
+    $('dev-login').classList.toggle('hidden', on);
+    $('dev-tools').classList.toggle('hidden', !on);
+  },
+
+  /* ---------- Bank seizure popup (pauses the game until every seizure has been acknowledged) ---------- */
+  showSeizures(names) {
+    if (!names.length) return;
+    this.seizeQueue.push(...names);
+    if ($('seize-modal').classList.contains('hidden')) {
+      Game.pause();
+      Sound.play('alert');
+      Haptics.medium();
+      this.nextSeizure();
+    } else {
+      this.updateSeizeCount();
+    }
+  },
+
+  nextSeizure() {
+    const name = this.seizeQueue.shift();
+    if (!name) { this.closeSeizures(); return; }
+    $('seize-text').innerHTML = `⚠️ <strong>BANK SEIZURE!</strong> You couldn't pay your loan. The bank forcibly sold <strong>${name}</strong> to cover your debts!`;
+    $('seize-modal').classList.remove('hidden');
+    this.updateSeizeCount();
+  },
+
+  updateSeizeCount() {
+    $('seize-count').textContent = this.seizeQueue.length ? `${this.seizeQueue.length} more seizure${this.seizeQueue.length === 1 ? '' : 's'} to review.` : '';
+  },
+
+  closeSeizures() {
+    this.seizeQueue = [];
+    $('seize-modal').classList.add('hidden');
+    Game.unpause();
+  },
+
+  /* ---------- Prestige and victory ---------- */
+  // The prestige panel in Settings and the small badge next to the rent in the HUD.
+  renderPrestige(s) {
+    const m = Prestige.mult, next = prestigeFor(s);
+    $('prestige-active').textContent = `Active Prestige: x${m.toFixed(2)}`;
+    $('prestige-badge').textContent = `⭐x${m.toFixed(2)}`;
+    $('prestige-badge').classList.toggle('hidden', m <= 1);
+    $('prestige-info').textContent = `All rent is multiplied by your prestige bonus. Net worth now: ${fmtMoney(netWorthOf(s))} `
+      + `(${Math.round(Math.max(0, netWorthOf(s)) / ENDGAME_NET_WORTH * 100)}% of the ${fmtMoney(ENDGAME_NET_WORTH)} endgame). `
+      + (next > m ? `Prestiging now would raise it to x${next.toFixed(2)}.` : `Grow your net worth to beat x${m.toFixed(2)}.`)
+      + (Prestige.data.count ? ` Prestiges so far: ${Prestige.data.count}.` : '');
+  },
+
+  prestigeRows(s) {
+    const m = Prestige.mult, next = Math.max(m, prestigeFor(s));
+    return `<div class="row"><span>Net worth</span><strong>${fmtMoney(netWorthOf(s))}</strong></div>
+      <div class="row"><span>Endgame net worth</span><span>${fmtMoney(ENDGAME_NET_WORTH)}</span></div>
+      <div class="row"><span>Current multiplier</span><span>x${m.toFixed(2)}</span></div>
+      <div class="row"><span>New multiplier</span><strong>x${next.toFixed(2)}</strong></div>`;
+  },
+
+  openPrestige() {
+    const s = Game.state, m = Prestige.mult;
+    $('prestige-stats').innerHTML = this.prestigeRows(s)
+      + (prestigeFor(s) <= m ? `<p class="muted" style="margin-top:8px">Your net worth would not raise your bonus: you keep x${m.toFixed(2)}.</p>` : '');
+    $('prestige-modal').classList.remove('hidden');
+  },
+
+  showVictory(s) {
+    $('victory-stats').innerHTML = this.prestigeRows(s)
+      + `<div class="row"><span>Total rent collected</span><span>${fmtMoney(s.stats.totalRent)}</span></div>
+         <div class="row"><span>Time played</span><span>${s.months} months (${fmtDate(s.months)})</span></div>`;
+    $('victory-modal').classList.remove('hidden');
+  },
+
+  // A floating "+$15" over the Work button on every tap.
+  popWork(pay) {
+    const btn = $('work-btn');
+    if (!btn) return;
+    const el = document.createElement('span');
+    el.className = 'float-pay';
+    el.textContent = `+${fmtMoney(pay)}`;
+    el.style.left = `${35 + Math.random() * 30}%`;
+    el.style.top = `${btn.offsetTop - 6}px`;
+    btn.parentElement.appendChild(el);
+    setTimeout(() => el.remove(), 800);
+  },
+
+  // Bankruptcy screen: what you had at your best, crossed out, next to what is left.
+  showGameOver(s) {
+    const owed = totalDebt(s) + Math.max(0, -s.cash);
+    $('gameover-stats').innerHTML = `
+      <div class="bk-tile wide"><div><small>🏙️ Empire value at its peak</small><s>${fmtMoney(s.stats.peakWorth || 0)}</s></div><span class="zero">$0</span></div>
+      <div class="bk-tile"><small>🏚️ Properties seized</small><strong>${s.stats.seized}</strong></div>
+      <div class="bk-tile"><small>💸 Debt left unpaid</small><strong>${fmtMoney(owed)}</strong></div>
+      <div class="bk-tile"><small>💰 Rent collected</small><strong>${fmtMoney(s.stats.totalRent)}</strong></div>
+      <div class="bk-tile"><small>⏱️ Survived</small><strong>${s.months} months</strong></div>`;
+    $('gameover-note').textContent = Prestige.mult > 1 ? `⭐ Your prestige bonus x${Prestige.mult.toFixed(2)} is safe and carries over.` : '';
+    $('gameover-modal').classList.remove('hidden');
+  },
+  hideGameOver() { $('gameover-modal').classList.add('hidden'); },
+
+  // A button that also enables/disables itself as cash changes (see refreshHud).
+  btn(act, id, label, cost = 0, cls = '', arg = '') {
+    return `<button class="btn ${cls}" data-act="${act}" data-id="${id}" data-arg="${arg}" data-cost="${cost}" ${Game.state.cash < cost ? 'disabled' : ''}>${label}</button>`;
+  },
+
+  // Cheap per-frame update: numbers, month bar and date, bank tiles and button states.
+  refreshHud(s, now = Date.now()) {
+    const debt = totalDebt(s);
+    $('cash').textContent = fmtMoney(s.cash);
+    $('cash').classList.toggle('neg', s.cash < 0);
+    $('debt').textContent = fmtMoney(debt);
+    $('income').textContent = fmtMoney(Engine.tickIncome(s));
+    const left = Math.max(0, Engine.msToNextTick(s, now));
+    $('tick-fill').style.width = `${100 - (left / CONFIG.TICK_MS) * 100}%`;
+    $('tick-text').textContent = `Next month in ${Math.ceil(left / 1000)}s`;
+    $('date-text').textContent = `📅 ${fmtDate(s.months)}`;
+
+    // Bank overview tiles (cash changes on every Work tap, so these update every frame).
+    const due = s.loans.reduce((a, l) => a + Math.min(l.payment, l.balance), 0);
+    const cover = debt > 0 ? Math.min(100, (Math.max(0, s.cash) / debt) * 100) : 100;
+    $('bank-cash').textContent = fmtMoney(s.cash);
+    $('bank-cash').classList.toggle('neg', s.cash < 0);
+    $('bank-debt').textContent = fmtMoney(debt);
+    $('bank-due').textContent = fmtMoney(due);
+    $('bank-assets').textContent = fmtMoney(assetsOf(s));
+    $('cover-fill').style.width = `${cover}%`;
+    $('cover-text').textContent = debt > 0 ? `${Math.round(cover)}%` : 'Debt free 🎉';
+
+    document.querySelectorAll('[data-cost]').forEach((b) => { b.disabled = s.cash < Number(b.dataset.cost); });
+  },
+
+  renderAll(s) {
+    this.refreshHud(s);
+    this.renderMap(s);
+    this.renderCareer(s);
+    this.renderBank(s);
+    this.renderModal(s);
+    this.renderBuy(s);
+    this.renderLoanCards(s);
+    this.renderPrestige(s);
+  },
+
+  /* ---------- Map tab: fog of war, pins ---------- */
+  // Keeps the fog in step with the save: adds the cloud picture (and lock label) of every locked district that has
+  // none (new game, reset), and clears pictures left over a district that opened without the camera (developer's Buy all).
+  syncFog(s) {
+    const fog = $('map-fog'), labels = $('map-labels');
+    DISTRICTS.forEach((d) => {
+      const img = fog.querySelector(`.fog-layer[data-zone="${d.id}"]:not([data-clearing])`);
+      const locked = !s.unlockedDistricts.includes(d.id);
+      if (locked && !img) {
+        const [cx, cy] = zoneCenter(d), need = d.unlockAt ? `own ${d.unlockAt}` : 'take a loan';
+        // Same z-index for every picture, so the DOM order decides the stacking: north first, south last (on top).
+        // A new picture is inserted straight into its place. Pictures already on the page are never moved,
+        // because moving an element restarts its CSS animation (that made unlocks restart on every tap).
+        const after = [...fog.querySelectorAll('.fog-layer')].find((x) => Number(x.dataset.z) > d.fogZ) || null;
+        const cloud = document.createElement('img');
+        cloud.className = 'fog-layer';
+        cloud.alt = '';
+        cloud.draggable = false;
+        Object.assign(cloud.dataset, { zone: d.id, z: d.fogZ, cloud: d.cloud });
+        cloud.onerror = () => UI.fogError(cloud);
+        cloud.src = this.cloudSrc(d.cloud);
+        fog.insertBefore(cloud, after);
+        labels.querySelectorAll(`[data-zone-tag="${d.id}"]:not(.gone)`).forEach((t) => t.remove());   // no duplicate labels
+        labels.insertAdjacentHTML('beforeend',
+          `<span class="zone-tag" data-zone-tag="${d.id}" style="left:${cx}%;top:${cy}%">🔒 ${d.name} · ${need}</span>`);
+      } else if (!locked && img) {
+        this.revealDistrict(d.id, false);
+      }
+    });
+  },
+
+  // Day or night cloud picture, following the current theme.
+  cloudSrc(n) {
+    return document.body.classList.contains('light-mode') ? `assets/cloud_${n}.png` : `assets/cloud_${n}_night.png`;
+  },
+
+  // A cloud picture failed to load: a missing night version falls back to the day picture; a missing day picture hides.
+  fogError(img) {
+    const day = `assets/cloud_${img.dataset.cloud}.png`;
+    if (img.getAttribute('src') !== day) img.src = day;
+    else img.classList.add('missing');
+  },
+
+  // Theme switch: swap every remaining cloud to its day / night picture (the map picture follows --map-img in the CSS).
+  applyFogTheme() {
+    $('map-fog').querySelectorAll('.fog-layer').forEach((img) => {
+      img.classList.remove('missing');
+      img.src = this.cloudSrc(img.dataset.cloud);
+    });
+  },
+
+  // A district just unlocked. With pan: switch to the map and center the camera on it first; then the cloud picture
+  // pulses while sliding off sideways and fading, the achievement sound plays, and the picture is removed.
+  revealDistrict(id, pan) {
+    if (this.unlocking[id]) return;   // lock: this district's unlock animation is already running
+    const fog = $('map-fog'), img = fog.querySelector(`.fog-layer[data-zone="${id}"]:not([data-clearing])`);
+    if (!img) return;
+    this.unlocking[id] = img;
+    img.dataset.clearing = '1';
+    $('map-labels').querySelectorAll(`[data-zone-tag="${id}"]:not(.gone)`).forEach((tag) => {
+      tag.classList.add('gone');
+      setTimeout(() => tag.remove(), 400);
+    });
+    if (pan) {
+      this.showTab('map');
+      this.focusDistrict(id);
+    }
+    setTimeout(() => {
+      if (pan) Sound.play('achievement');
+      this.clearFog(img);
+    }, pan ? CONFIG.FOG_PAN_MS : 0);
+  },
+
+  clearFog(img) {
+    const [cx, cy] = zoneCenter(DISTRICTS.find((d) => d.id === img.dataset.zone));
+    img.style.setProperty('--dir', cx < 50 ? -1 : 1);       // left half of the map slides left, right half slides right
+    img.style.transformOrigin = `${cx}% ${cy}%`;            // pulse around the district, not the middle of the map
+    if (img.classList.contains('clearing')) return;   // never restart a running animation
+    img.classList.add('clearing');
+    const id = img.dataset.zone;
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      if (img.isConnected) img.remove();
+      if (this.unlocking[id] === img) delete this.unlocking[id];   // release this animation's lock (not a newer one)
+      if (Game.state) this.syncFog(Game.state);   // pick up anything that changed meanwhile (e.g. a restart)
+    };
+    img.addEventListener('animationend', done, { once: true });
+    setTimeout(done, CONFIG.FOG_CLEAR_MS);   // safety net: background tab, missing picture, reduced motion
+  },
+
+  // Scales the map evenly so it always covers the whole map window (never stretched, never leaving empty space).
+  fitWorld() {
+    const sc = $('map-scroll');
+    if (!sc.clientHeight || sc.classList.contains('docked')) return;   // map tab not visible, or shrunk above a sheet
+    const k = Math.max(1, sc.clientHeight / BASE_WORLD.h, sc.clientWidth / BASE_WORLD.w);
+    const w = Math.round(BASE_WORLD.w * k), h = Math.round(BASE_WORLD.h * k);
+    if (w === WORLD.w && h === WORLD.h) return;
+    const fx = (sc.scrollLeft + sc.clientWidth / 2) / WORLD.w, fy = (sc.scrollTop + sc.clientHeight / 2) / WORLD.h;
+    WORLD.w = w;
+    WORLD.h = h;
+    $('map-world').style.width = `${w}px`;
+    $('map-world').style.height = `${h}px`;
+    sc.scrollLeft = fx * w - sc.clientWidth / 2;   // keep the same spot in the middle of the screen
+    sc.scrollTop = fy * h - sc.clientHeight / 2;
+  },
+
+  renderMap(s) {
+    this.syncFog(s);
+
+    // Pins of open districts only: locked districts are hidden under the fog.
+    $('map-pins').innerHTML = BUILDINGS.filter((b) => s.unlockedDistricts.includes(b.zone)).map((b) => {
+      const key = pinKey(s, b.id);
+      return `<button class="pin ${key}${this.building === b.id ? ' sel' : ''}" data-id="${b.id}" style="left:${b.x}%;top:${b.y}%">
+        <span class="pin-dot">${DISTRICT_ICON[b.zone]}</span><span class="pin-tag">${b.name}${key === 'sale' ? ` $${fmtShort(priceOf(s, b))}` : ''}</span></button>`;
+    }).join('');
+
+    // The floating pill at the top of the map: the open pin's district, or your overall progress.
+    const sel = this.building && findBuilding(this.building), d = sel && DISTRICTS.find((x) => x.id === sel.zone);
+    $('map-info').textContent = d
+      ? `${DISTRICT_ICON[d.id]} ${d.name} · ${s.properties.filter((p) => findBuilding(p.id).zone === d.id).length}/${BUILDINGS.filter((b) => b.zone === d.id).length} owned`
+      : `🧭 Drag to explore · You own ${s.properties.length}/${BUILDINGS.length}`;
+  },
+
+  // Scrolls the map so the spot (x, y in % of the map) sits in the middle across and at `fy` of the window's height.
+  // The target is clamped to the map picture, so the camera never shows anything past its edges.
+  // Returns the scroll position the camera ends up at.
+  panTo(x, y, fy = 0.5, instant = false) {
+    const sc = $('map-scroll');
+    const left = Math.min(Math.max(0, (x / 100) * WORLD.w - sc.clientWidth / 2), Math.max(0, sc.scrollWidth - sc.clientWidth));
+    const top = Math.min(Math.max(0, (y / 100) * WORLD.h - sc.clientHeight * fy), Math.max(0, sc.scrollHeight - sc.clientHeight));
+    sc.scrollTo({ left, top, behavior: instant ? 'auto' : 'smooth' });
+    return { left, top };
+  },
+
+  // Scrolls the map window so the middle of the district is in view. Returns the final scroll position.
+  focusDistrict(id, instant) {
+    this.fitWorld();
+    const [x, y] = zoneCenter(DISTRICTS.find((d) => d.id === id));
+    return this.panTo(x, y, 0.5, instant);
+  },
+
+  // Red banner that drops down when a property breaks, plays the broken sound,
+  // and slides away again by itself after 5 seconds.
+  showBreakAlert(names) {
+    const el = $('alert-banner');
+    $('alert-text').textContent = names.length === 1
+      ? `⚠️ ${names[0]} broke down and pays no rent. Fix it now!`
+      : `⚠️ ${names.length} properties broke down (${names[0]} and more). Fix them now!`;
+    el.classList.add('show');
+    Sound.play('broken');
+    Haptics.medium();
+    clearTimeout(this.alertTimer);
+    this.alertTimer = setTimeout(() => el.classList.remove('show'), CONFIG.BREAK_ALERT_MS);
+  },
+
+  // The loan cards on the start screen and in the Bank tab, with their credit requirements.
+  renderLoanCards(s) {
+    const html = LOAN_OPTIONS.map((o) => {
+      const ok = loanCheck(s, o), total = Math.round(o.amount * (1 + o.rate));
+      const need = ok ? '' : ` Locked: needs ${fmtMoney(o.minAssets)} in property value, or ${o.minPaidOff} paid-off loan.`;
+      return `<button class="loan-card${ok ? '' : ' locked'}" data-id="${o.id}" ${ok ? '' : 'disabled'}>
+        <strong>${o.name}</strong><span class="amount">${fmtMoney(o.amount)}</span>
+        <small>${(o.rate * 100).toFixed(0)}% interest. You repay ${fmtMoney(Math.ceil(total / CONFIG.LOAN_TERM_CYCLES))} every month for ${CONFIG.LOAN_TERM_CYCLES} months. ${o.desc}${need}</small></button>`;
+    }).join('');
+    $('new-loans').innerHTML = html;
+
+    // Big animated cards for the very first loan (the intro screen).
+    const badge = { family: 'Safest start', bank: 'Most popular', investor: 'High roller' };
+    $('loan-options').innerHTML = LOAN_OPTIONS.map((o, i) => {
+      const ok = loanCheck(s, o), total = Math.round(o.amount * (1 + o.rate)), per = Math.ceil(total / CONFIG.LOAN_TERM_CYCLES);
+      return `<button class="loan-card intro-card ${o.id}${ok ? '' : ' locked'}" data-id="${o.id}" ${ok ? '' : 'disabled'} style="--i:${i}">
+        <span class="ic-badge">${ok ? badge[o.id] : '🔒 Locked'}</span>
+        <span class="ic-icon" aria-hidden="true">${o.icon}</span>
+        <span class="ic-name">${o.name}</span>
+        <span class="ic-amount">${fmtMoney(o.amount)}</span>
+        <span class="ic-chips"><span>📈 ${Math.round(o.rate * 100)}% interest</span><span>💸 ${fmtMoney(per)}/month</span><span>⏳ ${CONFIG.LOAN_TERM_CYCLES} months</span></span>
+        <span class="ic-cta">${ok ? 'Take this loan →' : `Unlocks with ${fmtMoney(o.minAssets)} in property or ${o.minPaidOff} paid-off loan`}</span>
+      </button>`;
+    }).join('');
+    const bonus = $('intro-bonus');
+    bonus.textContent = `⭐ New Game+ bonus active: all rent x${Prestige.mult.toFixed(2)}`;
+    bonus.classList.toggle('hidden', Prestige.mult <= 1);
+  },
+
+  /* ---------- Buy popup (opened by tapping a For Sale pin) ---------- */
+  openBuy(id) {
+    this.buyId = id;
+    $('buy-modal').classList.remove('hidden');
+    this.renderBuy(Game.state);
+  },
+
+  closeBuy() {
+    this.buyId = null;
+    $('buy-modal').classList.add('hidden');
+    this.clearFocus();
+  },
+
+  // While a bottom sheet is open, the map window shrinks to the part of the screen above it. The camera can then
+  // center any pin in that visible part using normal scrolling, which the browser keeps inside the map picture
+  // (no extra empty space is ever added below the map).
+  dock() {
+    const sc = $('map-scroll'), sheet = document.querySelector('.overlay.dock:not(.hidden) > .sheet');
+    if (!sheet || !$('view-map').classList.contains('active')) { this.undock(); return; }
+    const visible = Math.round(window.innerHeight - sheet.offsetHeight - sc.getBoundingClientRect().top);
+    sc.classList.add('docked');
+    document.body.classList.add('sheet-open');   // toasts move to the top while a sheet is open
+    sc.style.flex = 'none';
+    sc.style.height = `${Math.max(140, Math.min(visible, WORLD.h))}px`;
+  },
+
+  undock() {
+    const sc = $('map-scroll');
+    document.body.classList.remove('sheet-open');
+    if (!sc.classList.contains('docked')) return;
+    sc.classList.remove('docked');
+    sc.style.flex = '';
+    sc.style.height = '';
+  },
+
+  // Deselects the pin and gives the map its full height back when a property popup closes.
+  clearFocus() {
+    if (!this.buyId && !this.openId) this.undock();
+    if (!this.building) return;
+    this.building = null;
+    if (Game.state) this.renderMap(Game.state);
+  },
+
+  renderBuy(s) {
+    if (!this.buyId) return;
+    const b = findBuilding(this.buyId);
+    if (!b || findProp(s, b.id)) { this.closeBuy(); return; }
+    const zone = DISTRICTS.find((d) => d.id === b.zone), price = priceOf(s, b), short = price - s.cash;
+    const swing = Math.round((price / b.price - 1) * 100);
+    $('buy-title').textContent = `${DISTRICT_ICON[b.zone]} ${b.name}`;
+    $('buy-body').innerHTML = `
+      <span class="pill sale">For sale</span>
+      <div class="stats">
+        <div class="row"><span>District</span><span>${zone.name}</span></div>
+        <div class="row"><span>Price today</span><strong>${fmtMoney(price)}</strong></div>
+        <div class="row"><span>Market</span><span>${swing >= 0 ? '+' : ''}${swing}% vs list price ${fmtMoney(b.price)}</span></div>
+        <div class="row"><span>Base rent</span><span>${fmtMoney(b.rent)} per month</span></div>
+        <div class="row"><span>First repair</span><span>${b.repairLabel}, ${fmtMoney(b.repairCost)}</span></div>
+      </div>
+      ${short > 0 ? `<p class="muted">You need ${fmtMoney(short)} more cash.</p>` : ''}
+      ${this.btn('buy', b.id, `Buy for ${fmtMoney(price)}`, price)}
+      <button class="btn ghost" data-act="closebuy">Cancel</button>`;
+    this.dock();
+  },
+
+  /* ---------- Property popup (opened by tapping an owned pin) ---------- */
+  openProperty(id) {
+    this.openId = id;
+    $('property-modal').classList.remove('hidden');
+    this.renderModal(Game.state);
+  },
+
+  closeProperty() {
+    this.openId = null;
+    $('property-modal').classList.add('hidden');
+    this.clearFocus();
+  },
+
+  renderModal(s) {
+    if (!this.openId) return;
+    const p = findProp(s, this.openId);
+    if (!p) { this.closeProperty(); return; }
+    const b = findBuilding(p.id), key = statusKey(p);
+    const swing = Math.round((p.market - 1) * 100);
+    $('pm-title').textContent = b.name;
+
+    let actions = '';
+    if (p.broken) actions += this.btn('repair', p.id, `Repair for ${fmtMoney(p.fixCost)}`, p.fixCost, 'wide');
+    else if (p.status === 'repair') actions += this.btn('repair', p.id, `${p.repairLabel} for ${fmtMoney(p.repairCost)}`, p.repairCost, 'wide');
+    if (p.status === 'ready' && !p.broken) {
+      actions += this.btn('rent', p.id, `Normal tenant<br>${fmtMoney(tenantRent(p.baseRent, 'normal'))} per month`, 0, 'ghost', 'normal');
+      actions += this.btn('rent', p.id, `Premium tenant<br>${fmtMoney(tenantRent(p.baseRent, 'premium'))} per month`, 0, '', 'premium');
+    }
+    if (p.status === 'rented') actions += this.btn('evict', p.id, 'Evict tenant', 0, 'ghost wide');
+    if (p.status !== 'repair') {
+      [1, 2].forEach((lvl) => {
+        const done = p.reno >= lvl, cost = renoCost(p, lvl);
+        actions += done
+          ? `<button class="btn ghost" disabled>${RENO[lvl].name}<br>Done</button>`
+          : this.btn('reno', p.id, `Renovate: ${RENO[lvl].name}<br>${fmtMoney(cost)}, +${Math.round(RENO[lvl].bonus * 100)}% rent`, cost, '', String(lvl));
+      });
+    }
+    actions += this.btn('sell', p.id, `Sell for ${fmtMoney(offerOf(p))} (${swing >= 0 ? '+' : ''}${swing}% market)`, 0, 'sell wide');
+
+    const earning = p.status === 'rented' && !p.broken, zone = DISTRICTS.find((d) => d.id === b.zone);
+    $('pm-body').innerHTML = `
+      <div class="pm-head">
+        <span class="pm-icon">${DISTRICT_ICON[b.zone]}</span>
+        <div><span class="pill ${key}">${STATUS[key]}</span><small>${zone.name}</small></div>
+      </div>
+      <div class="pm-rent${earning ? '' : ' off'}">
+        <div><small>💰 Rent per month</small><strong>${earning ? fmtMoney(p.rent * Prestige.mult) : '$0'}</strong></div>
+        ${Prestige.mult > 1 ? `<em>⭐ x${Prestige.mult.toFixed(2)}</em>` : ''}
+      </div>
+      <div class="pm-stats">
+        <div><small>🏷️ Base rent</small><strong>${fmtMoney(p.baseRent)}</strong></div>
+        <div><small>👤 Tenant</small><strong>${p.tenant ? (p.tenant === 'premium' ? '💎 Premium' : 'Normal') : 'None'}</strong></div>
+        <div><small>✨ Renovation</small><strong>${RENO[p.reno].name} <span class="pm-stars">${'★'.repeat(p.reno)}<i>${'★'.repeat(MAX_RENO - p.reno)}</i></span></strong></div>
+        <div><small>💼 Invested</small><strong>${fmtMoney(p.buyPrice + p.repairCost + p.renoSpent)}</strong></div>
+      </div>
+      <div class="manage">${actions}</div>`;
+    this.dock();
+  },
+
+  /* ---------- Career tab: current job card, skill-tree path cards, education card grid ---------- */
+  renderCareer(s) {
+    const c = s.career, { path, idx, tier } = Game.jobInfo();
+    const degOf = (id) => DEGREES.find((d) => d.id === id);
+    const next = path.tiers[idx + 1];
+
+    const hero = `<div class="panel job-hero">
+        <div class="job-head">
+          <div class="job-icon">${tier.icon}</div>
+          <div class="job-info">
+            <span class="job-path">${path.icon} ${path.name} · Level ${idx + 1}/${path.tiers.length}</span>
+            <h2>${tier.name}</h2>
+            <span class="job-pay">${fmtMoney(tier.pay)} per tap</span>
+          </div>
+        </div>
+        <button class="btn work-btn" id="work-btn" data-act="work">💪 Work +${fmtMoney(tier.pay)}</button>
+        ${next
+          ? `<div class="promo">
+              <div class="meter-label"><span>Next: ${next.icon} ${next.name} (${fmtMoney(next.pay)}/tap)</span><span id="taps-text"></span></div>
+              <div class="bar bar-xp"><i id="taps-fill"></i></div>
+              <button class="btn" id="promote-btn" data-act="promote" disabled>⬆️ Promote to ${next.name} (free)</button>
+            </div>`
+          : `<p class="top-badge">🏆 You reached the top of ${path.name}!</p>`}
+        <p class="muted" id="taps-total" style="margin-top:10px"></p>
+      </div>`;
+
+    // Each path is a row of tier nodes: green = passed, gold = your level there, grey = not reached yet.
+    const paths = CAREERS.map((p) => {
+      const current = p.id === path.id, reached = c.tiers[p.id], lvl = reached === undefined ? -1 : reached;
+      const open = Game.canSwitch(p);
+      const nodes = p.tiers.map((t, i) => `<div class="node${i < lvl ? ' done' : i === lvl ? ' cur' : ''}">
+          <span>${t.icon}</span><small>${t.name}<br>${fmtMoney(t.pay)}</small></div>`).join('');
+      let foot;
+      if (current) {
+        foot = '<span class="pill rented">Current career</span>';
+      } else if (open) {
+        const saved = lvl >= 0 && p.tiers[lvl + 1] ? Math.min(c.taps[p.id] || 0, p.tiers[lvl].taps) : 0;
+        foot = (saved ? `<div class="meter-label"><small class="muted">Saved promotion progress</small><small class="muted">${saved}/${p.tiers[lvl].taps}</small></div>
+            <div class="bar bar-xp"><i style="width:${(saved / p.tiers[lvl].taps) * 100}%"></i></div>` : '')
+          + `<button class="btn ghost" data-act="switch" data-id="${p.id}">Switch: ${lvl >= 0 ? `resume as ${p.tiers[lvl].name}` : `start as ${p.tiers[0].name}`}</button>`;
+      } else {
+        foot = `<span class="lock-note">🔒 Needs ${degOf(p.needs).icon} ${degOf(p.needs).name}</span>`;
+      }
+      return `<div class="path-card${current ? ' current' : ''}${open ? '' : ' locked'}">
+          <div class="path-head"><strong>${p.icon} ${p.name}</strong><span class="muted">${fmtMoney(p.tiers[0].pay)}–${fmtMoney(p.tiers[p.tiers.length - 1].pay)}/tap</span></div>
+          <div class="tree">${nodes}</div>
+          <div class="path-foot">${foot}</div>
+        </div>`;
+    }).join('');
+
+    const degrees = DEGREES.map((d) => {
+      const earned = c.degrees.includes(d.id), studying = c.study && c.study.id === d.id, locked = d.needs && !c.degrees.includes(d.needs);
+      const unlocks = CAREERS.find((p) => p.needs === d.id);
+      let cls = '', foot;
+      if (earned) { cls = 'earned'; foot = '<span class="pill ready">✓ Earned</span>'; }
+      else if (studying) { cls = 'studying'; foot = '<div class="bar bar-xp"><i id="study-fill"></i></div><small id="study-text"></small>'; }
+      else if (locked) { cls = 'locked'; foot = `<small>🔒 Needs ${degOf(d.needs).name}</small>`; }
+      else if (c.study) foot = '<button class="btn ghost btn-card" disabled>Busy studying</button>';
+      else foot = this.btn('study', d.id, d.cost ? `Study ${fmtMoney(d.cost)}` : 'Study (free)', d.cost, 'btn-card');
+      return `<div class="dcard ${cls}">
+          <div class="dicon">${d.icon}</div>
+          <strong>${d.name}</strong>
+          <small>⏱ ${d.secs}s · ${d.cost ? fmtMoney(d.cost) : 'Free'}</small>
+          <small>${unlocks ? `Unlocks ${unlocks.icon} ${unlocks.name}` : 'Needed for every degree'}</small>
+          <div class="dfoot">${foot}</div>
+        </div>`;
+    }).join('');
+
+    $('career-root').innerHTML = `${hero}
+      <h2 class="section-title">🌳 Career paths</h2>${paths}
+      <h2 class="section-title">🎓 Education</h2><div class="dgrid">${degrees}</div>`;
+    this.refreshTaps(s);
+    this.tickCareer(s, Date.now());
+  },
+
+  // Live update of the tap counter and the promotion progress bar (runs on every Work tap).
+  refreshTaps(s) {
+    const { path, idx, tier } = Game.jobInfo(), done = s.career.taps[path.id] || 0;
+    $('taps-total').textContent = `Total Work taps: ${s.career.totalTaps}`;
+    if (!path.tiers[idx + 1]) return;
+    const shown = Math.min(done, tier.taps);
+    $('taps-text').textContent = `${shown}/${tier.taps} taps`;
+    $('taps-fill').style.width = `${(shown / tier.taps) * 100}%`;
+    $('promote-btn').disabled = shown < tier.taps;
+  },
+
+  // Updates the study progress bar every frame (the rest only re-renders on changes).
+  tickCareer(s, now) {
+    const st = s.career.study, fill = $('study-fill');
+    if (!st || !fill) return;
+    const d = DEGREES.find((x) => x.id === st.id), left = Math.max(0, st.endsAt - now);
+    fill.style.width = `${100 - (left / (d.secs * 1000)) * 100}%`;
+    $('study-text').textContent = `Studying: ${Math.ceil(left / 1000)}s left`;
+  },
+
+  /* ---------- Bank tab: loan cards and the payment center ---------- */
+  renderBank(s) {
+    const debt = totalDebt(s);
+    const cards = s.loans.map((l) => {
+      const total = loanTotalOf(l), paid = Math.max(0, total - l.balance), pct = Math.min(100, (paid / total) * 100);
+      return `<div class="loan-tile">
+          <div class="lt-head"><span class="lt-icon">${loanIcon(l)}</span>
+            <div><strong>${l.name}</strong><small>${Math.round(l.rate * 100)}% interest · ${fmtMoney(l.principal)} borrowed</small></div>
+            <span class="lt-pct">${Math.round(pct)}%</span></div>
+          <div class="lt-amount"><small>Left to pay</small><strong>${fmtMoney(l.balance)}</strong></div>
+          <div class="bar"><i style="width:${pct}%"></i></div>
+          <div class="lt-meta"><span>Repaid ${fmtMoney(paid)} of ${fmtMoney(total)}</span></div>
+          <div class="lt-meta"><span>💸 ${fmtMoney(l.payment)}/month</span><span>⏳ ${Math.ceil(l.balance / l.payment)} months left</span></div>
+        </div>`;
+    });
+    for (let i = s.loans.length; i < CONFIG.MAX_LOANS; i++) {
+      cards.push('<div class="loan-tile empty"><div><b>➕</b>Free loan slot<br><small>Take a new loan below</small></div></div>');
+    }
+    $('loan-list').innerHTML = cards.join('');
+    $('loan-count').textContent = `${s.loans.length}/${CONFIG.MAX_LOANS} active · ${s.stats.loansPaidOff} paid off`;
+
+    $('payoff-tile').innerHTML = `<div class="tile-head"><span class="tile-icon">🎯</span>
+        <div><strong>Pay off a loan</strong><small>Clear one loan in full</small></div></div>`
+      + (s.loans.map((l) => this.btn('payloan', l.id, `${loanIcon(l)} ${l.name}<span>${fmtMoney(l.balance)}</span>`, l.balance, 'ghost payoff-btn')).join('')
+        || '<p class="muted">No loans to pay off.</p>');
+
+    $('payall-wrap').innerHTML = `<div class="tile-head"><span class="tile-icon">💳</span>
+        <div><strong>Pay all debt</strong><small>Clear every loan at once</small></div></div>`
+      + (debt > 0
+        ? `<div class="payall-amount">${fmtMoney(debt)}</div><div class="payall-foot">${this.btn('payall', '', 'Clear all debt', debt, 'danger')}
+           ${s.cash < debt ? `<p class="muted" style="margin-top:6px">${fmtMoney(debt - s.cash)} more needed.</p>` : ''}</div>`
+        : '<p class="muted">🎉 You are debt free.</p>');
+    this.drawChart(s);
+  },
+
+  // Line graph of cash (gold) and debt (red). Plain canvas, no libraries.
+  drawChart(s) {
+    const cv = $('finance-chart'), ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height, L = 62, R = 12, T = 14, B = 30;
+    const css = getComputedStyle(document.body);
+    const col = (name) => css.getPropertyValue(name).trim();
+    const pts = s.history;
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = col('--muted');
+    if (pts.length < 2) { ctx.fillText('Collecting data... check back after a couple of months.', L, H / 2); return; }
+
+    const vals = pts.flatMap((p) => [p.cash, p.debt]);
+    const lo = Math.min(0, ...vals), hi = Math.max(1, ...vals);
+    const x = (i) => L + (i / (pts.length - 1)) * (W - L - R);
+    const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const v = lo + ((hi - lo) * i) / 4;
+      ctx.strokeStyle = col('--line');
+      ctx.beginPath(); ctx.moveTo(L, y(v)); ctx.lineTo(W - R, y(v)); ctx.stroke();
+      ctx.fillStyle = col('--muted');
+      ctx.fillText((v < 0 ? '-$' : '$') + fmtShort(Math.abs(v)), 4, y(v) + 4);
+    }
+    ctx.fillStyle = col('--muted');
+    ctx.fillText('Time (older  >  newer)', L, H - 8);
+
+    const line = (key, color) => {
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath();
+      pts.forEach((p, i) => { if (i) ctx.lineTo(x(i), y(p[key])); else ctx.moveTo(x(i), y(p[key])); });
+      ctx.stroke();
+    };
+    line('debt', col('--red'));
+    line('cash', col('--gold'));
+  },
+};
+
+/* ============================================================
+   6. GAME CONTROLLER  (state, loop, player actions)
+   ============================================================ */
+const Game = {
+  state: null,
+  loopTimer: null,
+  saveTimer: null,
+  paused: false,     // true while the bank seizure popup waits for OK
+  pausedAt: 0,
+
+  init() {
+    Prestige.load();
+    this.state = SaveManager.load() || newState();
+    Sound.init(this.state.audioOn, this.state.musicVol, this.state.sfxVol);
+    UI.init();
+    UI.applyTheme(this.state.lightMode);
+    UI.applyAudio(this.state.audioOn);
+    UI.applyVolumes(this.state);
+    Haptics.vibrationsEnabled = this.state.vibrationsEnabled === true;
+    UI.applyVibration(Haptics.vibrationsEnabled);
+    UI.renderAll(this.state);
+    if (this.state.hasStarted) this.resume();
+    else UI.showLoanScreen();
+  },
+
+  // Returning player: collect everything earned while the game was closed.
+  resume() {
+    const res = Engine.advance(this.state, Date.now());
+    this.checkStudy(Date.now());
+    if (this.checkBankruptcy()) return;
+    SaveManager.save(this.state);
+    UI.hideLoanScreen();
+    UI.focusDistrict(UI.district, true);
+    UI.renderAll(this.state);
+    if (res && res.ticks >= 2) UI.showOffline(res);
+    this.announceSeized(res);
+    this.checkVictory();
+    this.startLoop();
+  },
+
+  // Freezes the cycle timer (and any study timer) while a popup needs the player's answer.
+  pause() {
+    if (this.paused) return;
+    this.paused = true;
+    this.pausedAt = Date.now();
+  },
+
+  // Shifts the timers forward by the paused time, so no cycle passes while paused.
+  unpause() {
+    if (!this.paused) return;
+    const gap = Date.now() - this.pausedAt;
+    this.paused = false;
+    this.state.lastTick += gap;
+    if (this.state.career.study) this.state.career.study.endsAt += gap;
+    SaveManager.save(this.state);
+    UI.refreshHud(this.state);
+  },
+
+  startLoop() {
+    clearInterval(this.loopTimer);
+    clearInterval(this.saveTimer);
+    this.loopTimer = setInterval(() => this.frame(), CONFIG.UI_REFRESH_MS);
+    this.saveTimer = setInterval(() => SaveManager.save(this.state), CONFIG.AUTOSAVE_MS);
+  },
+
+  // Runs 4x per second. Timestamp-based, so background tabs catch up correctly.
+  frame() {
+    if (this.paused) return;
+    const now = Date.now();
+    const wasBroken = new Set(this.state.properties.filter((p) => p.broken).map((p) => p.id));
+    const res = Engine.advance(this.state, now);
+    if (this.checkBankruptcy()) return;
+    if (this.checkStudy(now)) UI.renderAll(this.state);
+    if (res) {
+      SaveManager.save(this.state);
+      UI.renderAll(this.state);
+      if (res.earned > 0) Sound.play('cash_in');                       // rent was collected
+      const fresh = this.state.properties.filter((p) => p.broken && !wasBroken.has(p.id)).map((p) => findBuilding(p.id).name);
+      if (fresh.length) UI.showBreakAlert(fresh);                      // new breakdown: 5 second banner
+      if (res.ticks > 1) UI.showOffline(res);
+      else if (!res.seized.length) {
+        const parts = [];
+        if (res.earned > 0) parts.push(`+${fmtMoney(res.earned)} Rent`);
+        if (res.paid > 0) parts.push(`-${fmtMoney(res.paid)} Bank Rate`);
+        if (res.breaks > 0) parts.push('Breakdown!');
+        if (parts.length) UI.toast(parts.join(' | '));
+      }
+      this.announceSeized(res);
+      this.checkVictory();
+    }
+    UI.refreshHud(this.state, now);
+    UI.tickCareer(this.state, now);
+  },
+
+  // A seizure popup for every property the bank sold in the last cycle(s). The game pauses until OK.
+  announceSeized(res) {
+    if (res && res.seized.length) UI.showSeizures(res.seized);
+  },
+
+  // Shows the Congratulations screen the first time the victory condition is met in a run.
+  checkVictory() {
+    const s = this.state;
+    if (s.victoryShown || !s.hasStarted || !isVictory(s)) return;
+    s.victoryShown = true;
+    SaveManager.save(s);
+    UI.closeProperty();
+    UI.closeBuy();
+    UI.showVictory(s);
+    Sound.play('victory');
+  },
+
+  // Saves, refreshes everything. Called after every player action.
+  commit() {
+    this.checkUnlocks();
+    Engine.record(this.state, true);
+    SaveManager.save(this.state);
+    UI.renderAll(this.state);
+    this.checkVictory();
+  },
+
+  checkUnlocks() {
+    const s = this.state;
+    if (!s.hasStarted) return;   // the map stays fully covered until the first loan is taken
+    DISTRICTS.forEach((d) => {
+      if (s.properties.length >= d.unlockAt && !s.unlockedDistricts.includes(d.id)) {
+        s.unlockedDistricts.push(d.id);
+        UI.toast(d.unlockAt ? `${d.name} unlocked: new properties listed` : `${d.name} is open: buy your first property!`);
+        UI.revealDistrict(d.id, true);   // camera pans there, achievement sound, clouds blow away
+      }
+    });
+  },
+
+  /* ----- Bank ----- */
+  // Takes a loan. The very first one starts the game.
+  borrow(id) {
+    const s = this.state, opt = LOAN_OPTIONS.find((o) => o.id === id);
+    if (!opt) return;
+    if (!loanCheck(s, opt)) { UI.bankMsg(`${opt.name} is locked: you need ${fmtMoney(opt.minAssets)} in property value, or ${opt.minPaidOff} paid-off loan.`); return; }
+    if (s.hasStarted && s.loans.length >= CONFIG.MAX_LOANS) { UI.bankMsg(`You can only have ${CONFIG.MAX_LOANS} active loans. Pay one off first.`); return; }
+    const total = Math.round(opt.amount * (1 + opt.rate));   // principal + interest
+    s.cash += opt.amount;
+    s.loans.push({ id: `${opt.id}-${Date.now()}`, name: opt.name, principal: opt.amount, balance: total, rate: opt.rate,
+      payment: Math.ceil(total / CONFIG.LOAN_TERM_CYCLES) });
+    if (!s.hasStarted) {
+      s.hasStarted = true;
+      s.lastTick = Date.now();
+      s.history = [];
+      Engine.record(s, false);
+      UI.hideLoanScreen();
+      UI.focusDistrict(UI.district, true);
+      this.startLoop();
+    } else {
+      UI.bankMsg(`Loan received: ${fmtMoney(opt.amount)}. You owe ${fmtMoney(total)} on it.`);
+    }
+    Sound.play('cash_in');
+    this.commit();
+  },
+
+  // Pays a custom amount toward the debt, oldest loan first.
+  payEarly(raw) {
+    const s = this.state, debt = totalDebt(s), amount = Math.floor(Number(raw));
+    if (!(amount > 0)) { UI.bankMsg('Enter an amount to pay.'); return; }
+    if (debt <= 0) { UI.bankMsg('You have no debt.'); return; }
+    const pay = Math.min(amount, debt);
+    if (s.cash < pay) { UI.bankMsg(`Not enough cash. You have ${fmtMoney(s.cash)}.`); return; }
+    let left = pay;
+    for (const l of s.loans) {
+      const x = Math.min(l.balance, left);
+      l.balance -= x;
+      left -= x;
+      if (left <= 0) break;
+    }
+    const openLoans = s.loans.length;
+    s.loans = s.loans.filter((l) => l.balance > 0);
+    s.stats.loansPaidOff += openLoans - s.loans.length;
+    s.cash -= pay;
+    s.stats.loanPaid += pay;
+    $('pay-amount').value = '';
+    UI.bankMsg(`Paid ${fmtMoney(pay)} toward your loans.`);
+    Sound.play('cash_out');
+    this.commit();
+  },
+
+  // Clears one loan completely.
+  payLoan(id) {
+    const s = this.state, l = s.loans.find((x) => x.id === id);
+    if (!l) return;
+    if (s.cash < l.balance) { UI.bankMsg(`Not enough cash: ${l.name} needs ${fmtMoney(l.balance)}.`); return; }
+    s.cash -= l.balance;
+    s.stats.loanPaid += l.balance;
+    s.stats.loansPaidOff += 1;
+    s.loans = s.loans.filter((x) => x !== l);
+    UI.bankMsg(`${l.name} paid off in full.`);
+    Sound.play('achievement');
+    this.commit();
+  },
+
+  // Clears every loan at once, only if the cash covers the whole debt.
+  payAll() {
+    const s = this.state, debt = totalDebt(s);
+    if (debt <= 0) { UI.bankMsg('You have no debt.'); return; }
+    if (s.cash < debt) { UI.bankMsg(`Not enough cash. You need ${fmtMoney(debt)} to clear all debt.`); return; }
+    s.cash -= debt;
+    s.stats.loanPaid += debt;
+    s.stats.loansPaidOff += s.loans.length;
+    s.loans = [];
+    UI.bankMsg(`All debt cleared: paid ${fmtMoney(debt)}.`);
+    Sound.play('achievement');
+    this.commit();
+  },
+
+  /* ----- Settings ----- */
+  toggleTheme() {
+    this.state.lightMode = !this.state.lightMode;
+    UI.applyTheme(this.state.lightMode);
+    this.commit();
+  },
+
+  addCash(n) {
+    this.state.cash += n;
+    UI.toast(`Developer: added ${fmtMoney(n)}`);
+    this.commit();
+  },
+
+  // kind = 'music' or 'sfx', value = 0..1 from the slider. Saved when the slider is released.
+  setVolume(kind, value) {
+    const v = Math.min(1, Math.max(0, Number(value)));
+    if (kind === 'music') this.state.musicVol = v; else this.state.sfxVol = v;
+    Sound.setVolumes(this.state.musicVol, this.state.sfxVol);
+    UI.applyVolumes(this.state);
+  },
+
+  /* ----- Developer tools (only reachable after the password) ----- */
+  devUnlockDegrees() {
+    const c = this.state.career;
+    c.degrees = DEGREES.map((d) => d.id);
+    c.study = null;
+    UI.toast('Developer: all degrees unlocked');
+    this.commit();
+  },
+
+  devClearDebt() {
+    this.state.loans = [];
+    UI.toast('Developer: all debt cleared');
+    this.commit();
+  },
+
+  // Breaks a random rented property (or any working one if none is rented).
+  devBreakdown() {
+    const s = this.state, working = s.properties.filter((p) => !p.broken && p.status !== 'repair');
+    const rented = working.filter((p) => p.status === 'rented'), pool = rented.length ? rented : working;
+    if (!pool.length) { UI.toast('Developer: no working property to break'); return; }
+    const p = pool[Math.floor(Math.random() * pool.length)];
+    p.broken = true;
+    p.fixCost = fixCostOf(p);
+    s.stats.breakdowns += 1;
+    UI.showBreakAlert([findBuilding(p.id).name]);
+    this.commit();
+  },
+
+  // Gives you every property you don't own yet, for free (opens every district too).
+  devBuyAll() {
+    const s = this.state;
+    s.unlockedDistricts = DISTRICTS.map((d) => d.id);
+    const fresh = BUILDINGS.filter((b) => !findProp(s, b.id));
+    fresh.forEach((b) => s.properties.push(newProperty(b, priceOf(s, b))));
+    UI.closeBuy();
+    Sound.play('cash_in');
+    UI.toast(fresh.length ? `Developer: ${fresh.length} properties added` : 'Developer: you already own everything');
+    this.commit();
+  },
+
+  // Fixes every broken property and finishes every first repair, for free.
+  devRepairAll() {
+    let n = 0;
+    this.state.properties.forEach((p) => {
+      if (p.broken || p.status === 'repair') n++;
+      p.broken = false;
+      if (p.status === 'repair') p.status = 'ready';
+    });
+    $('alert-banner').classList.remove('show');
+    Sound.play('repair');
+    UI.toast(n ? `Developer: ${n} properties repaired` : 'Developer: nothing needed repair');
+    this.commit();
+  },
+
+  toggleVibration() {
+    this.state.vibrationsEnabled = !this.state.vibrationsEnabled;
+    Haptics.vibrationsEnabled = this.state.vibrationsEnabled;
+    UI.applyVibration(this.state.vibrationsEnabled);
+    Haptics.light();   // a short buzz confirms it is on
+    SaveManager.save(this.state);
+  },
+
+  toggleAudio() {
+    this.state.audioOn = !this.state.audioOn;
+    Sound.setMuted(!this.state.audioOn);
+    UI.applyAudio(this.state.audioOn);
+    SaveManager.save(this.state);
+  },
+
+  /* ----- Properties and career actions (all buttons with data-act land here) ----- */
+  act(type, id, arg) {
+    const s = this.state;
+    if (type === 'closebuy') { UI.closeBuy(); return; }
+    if (type === 'work') { this.work(); return; }
+    if (type === 'switch') { this.switchPath(id); return; }
+    if (type === 'promote') { this.promote(); return; }
+    if (type === 'study') { this.startStudy(id); return; }
+    if (type === 'payloan') { this.payLoan(id); return; }
+    if (type === 'payall') { this.payAll(); return; }
+
+    const b = findBuilding(id), p = findProp(s, id);
+    if (!b) return;
+
+    if (type === 'buy') {
+      const price = priceOf(s, b);
+      if (p || !s.unlockedDistricts.includes(b.zone) || s.cash < price) return;
+      s.cash -= price;
+      s.properties.push(newProperty(b, price));
+      UI.closeBuy();
+      Sound.play('cash_out');
+      UI.toast(`Bought ${b.name}. Tap its pin to manage it.`);
+    } else if (!p) {
+      return;
+    } else if (type === 'repair') {
+      const cost = p.broken ? p.fixCost : p.status === 'repair' ? p.repairCost : -1;
+      if (cost < 0 || s.cash < cost) return;
+      s.cash -= cost;
+      p.broken = false;
+      if (p.status === 'repair') p.status = 'ready';
+      Sound.play('repair');
+    } else if (type === 'rent') {
+      if (p.status !== 'ready' || p.broken) return;
+      p.tenant = arg === 'premium' ? 'premium' : 'normal';
+      p.rent = tenantRent(p.baseRent, p.tenant);
+      p.status = 'rented';
+    } else if (type === 'evict') {
+      if (p.status !== 'rented') return;
+      p.status = 'ready';
+      p.tenant = null;
+      p.rent = 0;
+    } else if (type === 'reno') {
+      const lvl = Number(arg);
+      if (!RENO[lvl] || lvl <= p.reno || p.status === 'repair') return;
+      const cost = renoCost(p, lvl);
+      if (s.cash < cost) return;
+      s.cash -= cost;
+      p.renoSpent += cost;
+      p.reno = lvl;
+      p.baseRent = baseRentOf(p);
+      if (p.status === 'rented') p.rent = tenantRent(p.baseRent, p.tenant);
+      Sound.play('repair');
+    } else if (type === 'sell') {
+      const offer = offerOf(p);
+      s.cash += offer;
+      s.properties = s.properties.filter((x) => x.id !== id);
+      UI.closeProperty();
+      Sound.play('cash_in');
+      UI.toast(`Sold ${b.name} for ${fmtMoney(offer)}`);
+    } else {
+      return;
+    }
+    this.commit();
+  },
+
+  /* ----- Career ----- */
+  // The player's current path, tier number and tier.
+  jobInfo() {
+    const c = this.state.career, path = CAREERS.find((p) => p.id === c.path), idx = c.tiers[c.path] || 0;
+    return { path, idx, tier: path.tiers[idx] };
+  },
+
+  // One Work tap: earns the tier's pay and counts toward the next promotion. No cooldown, debounce or throttle:
+  // every physical tap pays out at once and plays its own click sound and light vibration.
+  work() {
+    const c = this.state.career;
+    c.totalTaps += 1;
+    c.taps[c.path] = (c.taps[c.path] || 0) + 1;
+    const pay = this.jobInfo().tier.pay;
+    this.state.cash += pay;
+    Sound.play('click');
+    Haptics.light();
+    UI.refreshHud(this.state);
+    UI.refreshTaps(this.state);
+    UI.popWork(pay);
+  },
+
+  // A path can be joined if it needs no degree or you own the degree.
+  canSwitch(path) {
+    return !path.needs || this.state.career.degrees.includes(path.needs);
+  },
+
+  // Switching keeps your progress in every path: going back resumes at your old tier.
+  switchPath(id) {
+    const c = this.state.career, path = CAREERS.find((p) => p.id === id);
+    if (!path || id === c.path || !this.canSwitch(path)) return;
+    c.path = id;
+    if (c.tiers[id] === undefined) c.tiers[id] = 0;
+    this.commit();
+  },
+
+  // Free promotion to the next tier, once enough Work taps were made in the current tier.
+  promote() {
+    const c = this.state.career, { path, idx, tier } = this.jobInfo(), next = path.tiers[idx + 1];
+    if (!next || (c.taps[path.id] || 0) < tier.taps) return;
+    c.tiers[path.id] = idx + 1;
+    c.taps[path.id] = 0;
+    Sound.play('achievement');
+    UI.toast(`Promoted to ${next.name}!`);
+    this.commit();
+  },
+
+  startStudy(id) {
+    const c = this.state.career, d = DEGREES.find((x) => x.id === id);
+    if (!d || c.study || c.degrees.includes(id)) return;
+    if (d.needs && !c.degrees.includes(d.needs)) return;
+    if (this.state.cash < d.cost) return;
+    this.state.cash -= d.cost;
+    c.study = { id, endsAt: Date.now() + d.secs * 1000 };
+    this.commit();
+  },
+
+  // Awards a degree once its timer is up (also works after being offline).
+  checkStudy(now) {
+    const c = this.state.career;
+    if (!c.study || now < c.study.endsAt) return false;
+    const d = DEGREES.find((x) => x.id === c.study.id);
+    c.degrees.push(d.id);
+    c.study = null;
+    Sound.play('achievement');
+    UI.toast(`Degree earned: ${d.name}`);
+    SaveManager.save(this.state);
+    return true;
+  },
+
+  /* ----- Game over / restart ----- */
+  checkBankruptcy() {
+    if (!this.state.bankrupt) return false;
+    this.gameOver();
+    return true;
+  },
+
+  // True game over: the bank seized every property and you still owe money.
+  gameOver() {
+    clearInterval(this.loopTimer);
+    clearInterval(this.saveTimer);
+    SaveManager.wipe();
+    this.paused = false;
+    UI.seizeQueue = [];
+    $('seize-modal').classList.add('hidden');
+    UI.closeProperty();
+    UI.closeBuy();
+    UI.showGameOver(this.state);
+    Sound.stopMusic();
+    Sound.play('gameover');
+    Haptics.heavy();
+  },
+
+  // Resets the run but keeps (or raises) the permanent rent multiplier earned by your net worth.
+  prestige() {
+    if (!this.state.hasStarted) return;
+    const earned = prestigeFor(this.state);
+    Prestige.data.multiplier = Math.max(Prestige.data.multiplier, earned);
+    Prestige.data.count += 1;
+    Prestige.save();
+    this.reset();
+    Sound.play('achievement');
+    UI.toast(`Prestige ${Prestige.data.count}: all rent x${Prestige.mult.toFixed(2)}`);
+  },
+
+  // Developer menu restart: a TRUE hard reset. The save and the prestige bonus are both wiped (back to x1.00).
+  // Only the Prestige / New Game Plus buttons carry a bonus into the next run.
+  hardReset() {
+    Prestige.data = { multiplier: 1, count: 0 };
+    Prestige.save();
+    this.reset();
+    UI.toast('Hard reset: save and prestige erased');
+  },
+
+  // Restart used by bankruptcy, prestige and the hard reset. It keeps the stored prestige bonus as it is
+  // (prestige() raises it before calling this; hardReset() clears it).
+  reset() {
+    clearInterval(this.loopTimer);
+    clearInterval(this.saveTimer);
+    SaveManager.wipe();
+    const { lightMode, audioOn, musicVol, sfxVol, vibrationsEnabled } = this.state;   // settings survive a restart
+    this.state = { ...newState(), lightMode, audioOn, musicVol, sfxVol, vibrationsEnabled };
+    this.paused = false;
+    UI.seizeQueue = [];
+    UI.unlocking = {};   // a new run may unlock its districts even while an old unlock animation is still finishing
+    ['seize-modal', 'victory-modal', 'prestige-modal', 'offline-modal'].forEach((id) => $(id).classList.add('hidden'));
+    Sound.startMusic();
+    UI.hideGameOver();
+    UI.closeProperty();
+    UI.closeBuy();
+    UI.district = 'rustbelt';
+    UI.building = null;
+    UI.showTab('map');
+    UI.renderAll(this.state);
+    UI.showLoanScreen();
+  },
+
+  // Console helper: Game.debugRewind(120), then reload to test offline progress.
+  debugRewind(minutes) {
+    this.state.lastTick -= minutes * 60000;
+    SaveManager.save(this.state);
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => Game.init());
+
+/* ============================================================
+   7. SWIPE-TO-CLOSE & BACKGROUND AUDIO  (attached after the DOM exists)
+   ============================================================ */
+// Closes whichever bottom sheet is open (property or buy popup).
+function closeModal(modal) {
+  if (modal.id === 'property-modal') UI.closeProperty();
+  else UI.closeBuy();
+}
+
+// Drag a bottom sheet down to close it: the sheet follows the finger, and past 80px it closes.
+// Only starts when the sheet is scrolled to its top, so scrolling the sheet's content still works.
+function attachSwipeToClose(modal) {
+  const sheet = modal.querySelector('.sheet');
+  let startY = null;
+  const resetSheet = () => { sheet.style.transform = ''; sheet.style.transition = ''; };
+
+  modal.addEventListener('touchstart', (e) => {
+    startY = null;
+    if (!sheet.contains(e.target) || sheet.scrollTop > 0 || e.touches.length !== 1) return;
+    startY = e.touches[0].clientY;
+    sheet.style.transition = 'none';
+  }, { passive: true });
+
+  modal.addEventListener('touchmove', (e) => {
+    if (startY === null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 80) {
+      startY = null;
+      closeModal(modal);
+      resetSheet();
+    } else if (dy > 0) {
+      sheet.style.transform = `translateY(${dy}px)`;
+    }
+  }, { passive: true });
+
+  const endSwipe = () => {
+    if (startY === null) return;
+    startY = null;
+    sheet.style.transition = 'transform .2s ease-out';   // short of 80px: snap back up
+    sheet.style.transform = '';
+    setTimeout(resetSheet, 220);
+  };
+  modal.addEventListener('touchend', endSwipe);
+  modal.addEventListener('touchcancel', endSwipe);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  attachSwipeToClose(document.getElementById('property-modal'));
+  attachSwipeToClose(document.getElementById('buy-modal'));
+
+  // Pause the music while the app is minimized / the tab is hidden, and resume it on return
+  // (only if music is switched on, and not after a game over stopped it).
+  document.addEventListener('visibilitychange', () => {
+    const bgm = Sound.bgm, musicEnabled = !Sound.muted && !Sound.halted;
+    if (!bgm) return;
+    if (document.hidden) { bgm.pause(); }
+    else if (musicEnabled && bgm.paused) { bgm.play().catch(() => {}); }
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14263a">
+  <title>Landlord Empire</title>
+  <style>
+/* ---------- Tokens ---------- */
+/* Dark mode is the default. body.light-mode overrides these variables. */
+:root {
+  --ink: #14263a;       /* always-dark navy: HUD, nav bar, outlines on colored fills */
+  --paper: #0f1c2b;     /* page background */
+  --card: #1a2c40;      /* cards and panels */
+  --text: #e6eef5;      /* body text */
+  --muted: #93a8ba;
+  --line: #2d4257;
+  --edge: #4e6a84;      /* input and card borders */
+  --gold: #f2b632;      /* money, primary actions */
+  --gold-ink: #3a2a00;
+  --green: #3f8f6b;     /* income */
+  --red: #c2443a;       /* debt, danger */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-h: 64px;
+}
+body.light-mode {
+  --paper: #e8eef1;
+  --card: #ffffff;
+  --text: #14263a;
+  --muted: #5d7085;
+  --line: #d3dde3;
+  --edge: #14263a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--ink); color: var(--text);
+  font-family: "Avenir Next", "Trebuchet MS", system-ui, sans-serif; }
+body { display: flex; justify-content: center; overflow: hidden; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+
+/* ---------- App shell ---------- */
+#app { width: 100%; max-width: 480px; height: 100dvh; display: flex; flex-direction: column; background: var(--paper); }
+main { flex: 1; overflow-y: auto; padding: 0 12px 16px; }
+.view { display: none; }
+.view.active { display: block; }
+
+/* ---------- HUD ---------- */
+.hud { display: flex; gap: 8px; padding: calc(10px + var(--safe-top)) 12px 8px; background: var(--ink); color: #fff; }
+.stat { flex: 1; min-width: 0; }
+.stat .label { display: block; font-size: 0.72rem; color: #9fb3c4; }
+.stat strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#debt { color: #ff9b8f; }
+#income { color: #8fe0b8; }
+#cash { color: var(--gold); }
+
+.tick-bar { position: relative; height: 20px; background: #0d1b2b; overflow: hidden; margin-bottom: 12px; }
+#tick-fill { height: 100%; width: 0; background: var(--green); }
+#tick-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.72rem; font-weight: 600; color: #fff; }
+
+/* ---------- Status colors and legend ---------- */
+:root { --c-sale: #f2b632; --c-repair: #e9856f; --c-ready: #7fb2e5; --c-rented: #7cc9a0; --c-owned: #9db4c6; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: .78rem; color: var(--muted); }
+.legend i { display: inline-block; width: 11px; height: 11px; margin-right: 5px; border-radius: 3px; border: 1px solid var(--ink); vertical-align: -1px; }
+
+.pill { color: var(--ink); display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 700; border: 1px solid var(--ink); }
+.pill.sale { background: var(--c-sale); } .pill.repair { background: var(--c-repair); }
+.pill.ready { background: var(--c-ready); } .pill.rented { background: var(--c-rented); }
+
+/* ---------- Panels & buttons ---------- */
+.panel { background: var(--card); border-radius: 14px; padding: 14px; margin-top: 12px; border: 1px solid var(--line); }
+.panel h2 { font-size: 1.1rem; margin-bottom: 8px; }
+.row { display: flex; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
+.row:last-child { border-bottom: 0; }
+
+.btn { display: block; width: 100%; margin-top: 12px; padding: 13px; border: 0; border-radius: 10px;
+  background: var(--gold); color: var(--gold-ink); font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; }
+.btn.ghost { background: var(--line); color: var(--text); }
+.btn.danger { background: var(--red); color: #fff; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+
+/* ---------- Bottom navigation ---------- */
+.bottom-nav { display: flex; height: calc(var(--nav-h) + var(--safe-bottom)); padding-bottom: var(--safe-bottom); background: var(--ink); }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: none; border: 0; color: #9fb3c4; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.nav-btn span { font-size: 1.35rem; }
+.nav-btn.active { color: var(--gold); }
+
+/* ---------- Overlays ---------- */
+.overlay { position: fixed; inset: 0; z-index: 10; background: rgba(10,22,36,.94); display: flex; align-items: center; justify-content: center;
+  padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom)); overflow-y: auto; }
+.sheet { width: 100%; max-width: 440px; background: var(--paper); border-radius: 18px; padding: 20px; }
+.sheet h1 { font-size: 1.45rem; margin-bottom: 8px; }
+
+.loan-card { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; margin-top: 10px; padding: 14px; text-align: left;
+  background: var(--card); border: 2px solid var(--edge); border-radius: 12px; font: inherit; color: var(--text); cursor: pointer; }
+.loan-card .amount { font-size: 1.2rem; font-weight: 800; color: var(--green); }
+.loan-card small { grid-column: 1 / -1; color: var(--muted); }
+.loan-card:active { border-color: var(--gold); }
+
+.toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + var(--safe-bottom) + 14px); transform: translateX(-50%);
+  background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 999px; font-size: 0.9rem; font-weight: 600; z-index: 20; }
+
+@media (prefers-reduced-motion: no-preference) {
+  #tick-fill { transition: width 0.25s linear; }
+}
+
+/* ---------- Stage 3: broken state, career ---------- */
+:root { --c-broken: #b23b3b; }
+.pill.broken { background: var(--c-broken); color: #fff; }
+.work-btn { padding: 22px; font-size: 1.3rem; border-radius: 16px; box-shadow: 0 4px 0 #b98a16; }
+.work-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b98a16; }
+.item { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.item:last-child { border-bottom: 0; }
+.item .row { padding: 0 0 6px; border: 0; }
+.item .btn { margin-top: 4px; padding: 10px; font-size: .9rem; }
+.bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--green); }
+
+/* ---------- Stage 4: negative cash, error banner ---------- */
+#cash.neg { color: #ff9b8f; }
+#error-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 99; background: #b23b3b; color: #fff; padding: 8px 12px; font-size: .8rem; }
+
+/* ---------- Stage 5: bank dashboard, property management, settings ---------- */
+.field { display: block; margin-top: 14px; font-size: .85rem; color: var(--muted); }
+.field input { display: block; width: 100%; margin-top: 4px; padding: 12px; border: 2px solid var(--edge); border-radius: 10px;
+  background: var(--card); color: var(--text); font: inherit; font-size: 1rem; }
+.meter + .meter { margin-top: 14px; }
+.meter-label { display: flex; justify-content: space-between; font-size: .85rem; font-weight: 600; }
+.bar-debt i { background: var(--red); }
+.manage { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.manage .btn { margin-top: 0; padding: 10px 6px; font-size: .82rem; line-height: 1.25; }
+.manage .wide { grid-column: 1 / -1; }
+.btn.sell { background: var(--red); color: #fff; }
+
+/* ---------- Stage 6: district chips, property hub and popup, chart ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 10px; }
+.chip { flex: none; padding: 7px 10px; border: 2px solid var(--edge); border-radius: 999px; background: var(--card); color: var(--text);
+  font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.chip.active { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+.chip.locked { opacity: .6; }
+
+.row.center { align-items: center; }
+.btn-sm { display: inline-block; width: auto; margin: 0; padding: 8px 14px; font-size: .85rem; }
+
+.sheet { max-height: 90dvh; overflow-y: auto; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.sheet-head h1 { margin: 0; }
+.close-btn { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--line); color: var(--text); font-size: 1.1rem; cursor: pointer; }
+
+#finance-chart { display: block; width: 100%; height: auto; border-radius: 10px; background: var(--paper); }
+
+/* ---------- Stage 7: scrollable map window with a fixed-size map and pins ---------- */
+.map-hint { margin: 0 0 8px; }
+
+/* The window you look through. The map inside it is bigger, so you swipe or drag to pan. */
+.map-scroll { width: 100%; aspect-ratio: 4 / 5; overflow: auto; border-radius: 14px; border: 2px solid var(--edge);
+  background: #cfd8dc; scrollbar-width: none; -ms-overflow-style: none; overscroll-behavior: contain;
+  touch-action: none; cursor: grab; user-select: none; }
+.map-scroll::-webkit-scrollbar { display: none; }
+.map-scroll.dragging { cursor: grabbing; }
+
+/* The map itself: a FIXED 16:9 size, so the picture is never stretched or blurred.
+   The picture fills the box exactly, so a pin at x% / y% lands on the same spot of the drawing. */
+.map-world { position: relative; flex: none; width: 1200px; height: 675px;
+  background:
+    url('assets/map.jpg') 0 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(0deg, rgba(20,38,58,.07) 0 2px, transparent 2px 60px),
+    repeating-linear-gradient(90deg, rgba(20,38,58,.07) 0 2px, transparent 2px 60px),
+    linear-gradient(160deg, #d5e3d0, #cfdde6 50%, #e4dcc9); }
+#map-pins { position: absolute; inset: 0; pointer-events: none; }
+
+/* A pin is the round head plus a small pointer. The pointer's TIP sits exactly on the x / y spot. */
+.pin { position: absolute; width: 40px; height: 40px; padding: 0; border: 0; background: none; font: inherit;
+  transform: translate(-50%, calc(-100% - 10px)); cursor: pointer; z-index: 2; pointer-events: auto; }
+.pin-dot { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  font-size: 1.35rem; border: 3px solid var(--ink); background: var(--c-sale); box-shadow: 0 3px 0 var(--ink); }
+.pin-dot::after { content: ''; position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%);
+  border: 6px solid transparent; border-top: 8px solid var(--ink); border-bottom: 0; }
+.pin-tag { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 14px; padding: 1px 6px;
+  border-radius: 6px; background: rgba(255,255,255,.93); color: var(--ink); font-size: .62rem; font-weight: 700;
+  white-space: nowrap; border: 1px solid var(--ink); }
+.pin.sale .pin-dot { background: var(--c-sale); } .pin.repair .pin-dot { background: var(--c-repair); }
+.pin.ready .pin-dot { background: var(--c-ready); } .pin.rented .pin-dot { background: var(--c-rented); }
+.pin.broken .pin-dot { background: var(--c-broken); }
+.pin.sel .pin-dot { outline: 3px solid #fff; }
+.pin:active .pin-dot { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .pin.broken .pin-dot { animation: pulse 1.4s infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 3px 0 var(--ink), 0 0 0 0 rgba(178,59,59,.6); }
+    50% { box-shadow: 0 3px 0 var(--ink), 0 0 0 12px rgba(178,59,59,0); }
+  }
+}
+
+/* ---------- Stage 8: breakdown banner, dev buttons, locked loans ---------- */
+.btn-row { display: flex; gap: 8px; }
+.btn-row .btn { flex: 1; padding: 12px 6px; font-size: .9rem; }
+.loan-card.locked, .loan-card:disabled { opacity: .55; cursor: default; }
+
+.alert { position: fixed; top: 0; left: 50%; width: 100%; max-width: 480px; z-index: 40; display: flex; align-items: center; gap: 10px;
+  padding: calc(10px + var(--safe-top)) 12px 10px; background: var(--c-broken); color: #fff; font-size: .88rem; font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0,0,0,.4); transform: translate(-50%, -130%); transition: transform .45s ease; pointer-events: none; }
+.alert.show { transform: translate(-50%, 0); pointer-events: auto; }
+.alert span { flex: 1; }
+.alert-btn { flex: none; padding: 8px 12px; border: 0; border-radius: 8px; background: #fff; color: var(--c-broken);
+  font: inherit; font-weight: 800; cursor: pointer; }
+</style>
+</head>
+<body class="light-mode">
+
+  <!-- MAIN APP (hidden until the starting loan is taken) -->
+  <div id="app" class="hidden">
+    <header class="hud">
+      <div class="stat"><span class="label">Cash</span><strong id="cash">$0</strong></div>
+      <div class="stat"><span class="label">Debt</span><strong id="debt">$0</strong></div>
+      <div class="stat"><span class="label">Rent per cycle</span><strong id="income">$0</strong></div>
+    </header>
+
+    <div class="tick-bar" role="progressbar" aria-label="Time until next rent">
+      <div id="tick-fill"></div>
+      <span id="tick-text"></span>
+    </div>
+
+    <main>
+      <!-- MAP: scrollable world map with clickable pins (buy and manage properties here) -->
+      <section id="view-map" class="view active">
+        <div class="chips" id="district-tabs"></div>
+        <p class="muted map-hint">Drag or swipe the map to look around. Tap a pin to buy or manage a property.</p>
+        <div class="map-scroll" id="map-scroll">
+          <div class="map-world" id="map-world">
+            <div id="map-pins"></div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--c-sale)"></i>For sale</span>
+          <span><i style="background:var(--c-repair)"></i>Needs repair</span>
+          <span><i style="background:var(--c-ready)"></i>Ready to rent</span>
+          <span><i style="background:var(--c-rented)"></i>Rented</span>
+          <span><i style="background:var(--c-broken)"></i>Broken</span>
+        </div>
+        <div class="legend">
+          <span>🏚️ Rustbelt</span><span>🏠 Maple</span><span>🏢 Midtown</span><span>🏨 Harbor</span><span>🏙️ Skyline</span>
+        </div>
+        <div class="panel" id="district-panel"></div>
+      </section>
+
+      <!-- CAREER (rendered by script.js) -->
+      <section id="view-career" class="view"><div id="career-root"></div></section>
+
+      <!-- BANK -->
+      <section id="view-bank" class="view">
+        <div class="panel">
+          <h2>Finances</h2>
+          <div class="meter">
+            <div class="meter-label"><span>Cash</span><span id="meter-cash-text"></span></div>
+            <div class="bar"><i id="meter-cash"></i></div>
+          </div>
+          <div class="meter">
+            <div class="meter-label"><span>Debt</span><span id="meter-debt-text"></span></div>
+            <div class="bar bar-debt"><i id="meter-debt"></i></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Cash vs debt over time</h2>
+          <canvas id="finance-chart" width="640" height="300"></canvas>
+          <div class="legend">
+            <span><i style="background:var(--gold)"></i>Cash</span>
+            <span><i style="background:var(--red)"></i>Debt</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Your loans</h2>
+          <div id="loan-list"></div>
+          <label class="field">Pay off early (goes to your oldest loan first)
+            <input type="number" id="pay-amount" min="1" step="100" inputmode="numeric" placeholder="Amount in $">
+          </label>
+          <button class="btn" id="pay-btn">Pay</button>
+          <p class="muted" id="bank-msg"></p>
+        </div>
+        <div class="panel">
+          <h2>Take a new loan</h2>
+          <div id="new-loans"></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="view-settings" class="view">
+        <div class="panel">
+          <h2>Appearance</h2>
+          <button class="btn ghost" id="theme-btn">Switch to dark mode</button>
+        </div>
+        <div class="panel">
+          <h2>Audio</h2>
+          <p class="muted">Sound is off until you turn it on.</p>
+          <button class="btn ghost" id="audio-btn">Unmute audio</button>
+        </div>
+        <div class="panel">
+          <h2>Developer menu</h2>
+          <p class="muted">For testing only.</p>
+          <div class="btn-row">
+            <button class="btn" id="dev-cash-btn">Add $100,000</button>
+            <button class="btn" id="dev-cash-btn-1m">Add $1,000,000</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Save data</h2>
+          <p class="muted">Erasing your save starts a new game from the loan screen.</p>
+          <button class="btn danger" id="reset-btn">Erase save and restart</button>
+          <p class="muted" id="version" style="margin-top:10px">Script not loaded, or an old script.js is still in use.</p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-tab="map"><span>🗺️</span>Map</button>
+      <button class="nav-btn" data-tab="career"><span>💼</span>Career</button>
+      <button class="nav-btn" data-tab="bank"><span>🏦</span>Bank</button>
+      <button class="nav-btn" data-tab="settings"><span>⚙️</span>Settings</button>
+    </nav>
+  </div>
+
+  <!-- STARTING LOAN (forced) -->
+  <div id="loan-screen" class="overlay hidden">
+    <div class="sheet">
+      <h1>Start with a bank loan</h1>
+      <p class="muted">You have no money yet. Pick a loan to fund your first apartment. A bigger loan buys more, but costs more to repay.</p>
+      <div id="loan-options"></div>
+    </div>
+  </div>
+
+  <!-- OFFLINE EARNINGS -->
+  <div id="offline-modal" class="overlay hidden">
+    <div class="sheet">
+      <h1>Welcome back</h1>
+      <p id="offline-text" class="muted"></p>
+      <button class="btn" id="offline-close">Collect</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER: shown only when the bank has seized everything and you still owe money -->
+  <div id="gameover-modal" class="overlay hidden">
+    <div class="sheet">
+      <h1>Bankruptcy</h1>
+      <p class="muted">The bank seized every property you owned and you still owe money. Your empire is gone.</p>
+      <button class="btn danger" id="restart-btn">Start over</button>
+    </div>
+  </div>
+
+  <!-- BUY CONFIRMATION (opened by tapping a For Sale pin) -->
+  <div id="buy-modal" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h1 id="buy-title"></h1>
+        <button class="close-btn" id="buy-close" aria-label="Close">✕</button>
+      </div>
+      <div id="buy-body"></div>
+    </div>
+  </div>
+
+  <!-- PROPERTY MANAGEMENT POPUP (opened by tapping an owned pin) -->
+  <div id="property-modal" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h1 id="pm-title"></h1>
+        <button class="close-btn" id="pm-close" aria-label="Close">✕</button>
+      </div>
+      <div id="pm-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- BREAKDOWN ALERT: drops down from the top while a property is broken -->
+  <div id="alert-banner" class="alert" role="alert"><span id="alert-text"></span><button id="alert-fix" class="alert-btn">Fix now</button></div>
+
+  <div id="error-banner" class="hidden"></div>
+  <script>
+    // Shows any script error on screen, so a white screen always explains itself.
+    window.addEventListener('error', function (e) {
+      var b = document.getElementById('error-banner');
+      b.textContent = 'Error: ' + e.message + ' (' + String(e.filename || '').split('/').pop() + ':' + e.lineno + ')';
+      b.classList.remove('hidden');
+    });
+  </script>
+  <script>
+'use strict';
+
+/* ============================================================
+   1. CONFIG & STATIC DATA
+   ============================================================ */
+const GAME_VERSION = 13;
+
+const CONFIG = {
+  SAVE_KEY: 'landlordEmpire_save_v2',
+  TICK_MS: 30_000,            // one rent / bank cycle
+  MAX_OFFLINE_MS: 4 * 60 * 60 * 1000,   // offline progress is capped at 4 hours (hard limit)
+  UI_REFRESH_MS: 250,
+  AUTOSAVE_MS: 10_000,
+  LOAN_TERM_CYCLES: 100,      // a loan is repaid over 100 cycles (50 minutes): heavy payments
+  MAX_LOANS: 2,               // at most 2 active loans at a time
+  BREAKDOWN_CHANCE: 0.05,     // per rented property, per live cycle
+  MARKET_SWING: 0.1,          // for-sale prices move +/-10% every cycle
+  BREAK_ALERT_MS: 5000,       // the breakdown banner hides itself after 5 seconds
+  WORK_COOLDOWN_MS: 400,
+  CHART_EVERY: 2,             // chart gets a new point every 2 cycles
+  CHART_POINTS: 60,
+};
+
+// rate = total interest added to the loan, repaid in equal installments every cycle.
+// Credit rule: you can take a loan if your property value is at least minAssets
+// OR you have fully paid off at least minPaidOff loans before.
+const LOAN_OPTIONS = [
+  { id: 'family',   name: 'Family loan',     amount: 30000,  rate: 0.08, minAssets: 0,      minPaidOff: 0, desc: 'Smallest and cheapest.' },
+  { id: 'bank',     name: 'Community bank',  amount: 60000,  rate: 0.15, minAssets: 0,      minPaidOff: 0, desc: 'A bigger start, heavier payments.' },
+  { id: 'investor', name: 'Investor credit', amount: 120000, rate: 0.25, minAssets: 150000, minPaidOff: 1, desc: 'Needs a track record.' },
+];
+
+// Size of the map on the page. It matches .map-world in style.css: 1200 x 675, a 16:9 picture.
+const WORLD = { w: 1200, h: 675 };
+
+// rect = the district's area on the map, in % of the map (x, y = top-left corner, w, h = size).
+// unlockAt = properties owned to open it. Locked districts are dimmed on the map.
+const DISTRICTS = [
+  { id: 'rustbelt', name: 'Rustbelt Row',   unlockAt: 0,  rect: { x: 15, y: 70, w: 60, h: 25 } },   // industrial, bottom
+  { id: 'maple',    name: 'Maple Heights',  unlockAt: 3,  rect: { x: 5,  y: 36, w: 30, h: 28 } },   // suburbs, mid-left
+  { id: 'midtown',  name: 'Midtown',        unlockAt: 7,  rect: { x: 36, y: 41, w: 28, h: 28 } },   // city center, middle
+  { id: 'harbor',   name: 'Harbor Quarter', unlockAt: 11, rect: { x: 70, y: 36, w: 28, h: 28 } },   // waterfront, mid-right
+  { id: 'skyline',  name: 'Skyline Crown',  unlockAt: 15, rect: { x: 25, y: 4,  w: 50, h: 28 } },   // skyscrapers, top
+];
+
+// Every property and its pin position.
+// x = across the map (0 = left edge, 100 = right edge), y = down the map (0 = top, 100 = bottom).
+// The pin's tip sits exactly on (x, y), so to move a pin just change these two numbers.
+const BUILDINGS = [
+  // rustbelt
+  { id: 'r1', zone: 'rustbelt', name: 'Tannery Flats',  x: 22, y: 80, price: 18000, rent: 220, repairLabel: 'Fix plumbing',           repairCost: 4000 },
+  { id: 'r2', zone: 'rustbelt', name: 'Mill St Duplex', x: 40, y: 86, price: 24000, rent: 300, repairLabel: 'Replace flooring',       repairCost: 5000 },
+  { id: 'r3', zone: 'rustbelt', name: 'Bakery Loft',    x: 55, y: 78, price: 15000, rent: 190, repairLabel: 'Rewire electrics',       repairCost: 3500 },
+  { id: 'r4', zone: 'rustbelt', name: 'Depot Row',      x: 68, y: 88, price: 32000, rent: 420, repairLabel: 'Repaint and patch roof', repairCost: 7000 },
+  // maple
+  { id: 'maple-1', zone: 'maple', name: 'Linden Court',   x: 12, y: 43, price: 60000,   rent: 750,  repairLabel: 'Fix plumbing',     repairCost: 13000 },
+  { id: 'maple-2', zone: 'maple', name: 'Maple Terrace',  x: 27, y: 45, price: 78000,   rent: 980,  repairLabel: 'Replace flooring', repairCost: 17000 },
+  { id: 'maple-3', zone: 'maple', name: 'Orchard Villas', x: 14, y: 57, price: 99000,   rent: 1240, repairLabel: 'Rewire electrics', repairCost: 22000 },
+  { id: 'maple-4', zone: 'maple', name: 'Parkgate Homes', x: 28, y: 59, price: 126000,  rent: 1580, repairLabel: 'Renovate roof',    repairCost: 27500 },
+  // midtown
+  { id: 'midtown-1', zone: 'midtown', name: 'Metro Lofts',    x: 42, y: 48, price: 160000,  rent: 2000, repairLabel: 'Fix plumbing',     repairCost: 35000 },
+  { id: 'midtown-2', zone: 'midtown', name: 'Bank St Flats',  x: 57, y: 50, price: 208000,  rent: 2600, repairLabel: 'Replace flooring', repairCost: 46000 },
+  { id: 'midtown-3', zone: 'midtown', name: 'Theatre Row',    x: 44, y: 62, price: 264000,  rent: 3300, repairLabel: 'Rewire electrics', repairCost: 58000 },
+  { id: 'midtown-4', zone: 'midtown', name: 'Civic Suites',   x: 58, y: 63, price: 336000,  rent: 4200, repairLabel: 'Renovate roof',    repairCost: 74000 },
+  // harbor
+  { id: 'harbor-1', zone: 'harbor', name: 'Pier Homes',     x: 78, y: 44, price: 400000,  rent: 5000, repairLabel: 'Fix plumbing',     repairCost: 88000 },
+  { id: 'harbor-2', zone: 'harbor', name: 'Beacon Flats',   x: 92, y: 46, price: 520000,  rent: 6500, repairLabel: 'Replace flooring', repairCost: 114500 },
+  { id: 'harbor-3', zone: 'harbor', name: 'Marina Lofts',   x: 80, y: 57, price: 660000,  rent: 8250, repairLabel: 'Rewire electrics', repairCost: 145000 },
+  { id: 'harbor-4', zone: 'harbor', name: 'Quay Towers',    x: 93, y: 59, price: 840000,  rent: 10500, repairLabel: 'Renovate roof',    repairCost: 185000 },
+  // skyline
+  { id: 'skyline-1', zone: 'skyline', name: 'Crown Suites',   x: 33, y: 16, price: 1000000, rent: 12500, repairLabel: 'Fix plumbing',     repairCost: 220000 },
+  { id: 'skyline-2', zone: 'skyline', name: 'Sky Gardens',    x: 48, y: 13, price: 1300000, rent: 16250, repairLabel: 'Replace flooring', repairCost: 286000 },
+  { id: 'skyline-3', zone: 'skyline', name: 'Apex Tower',     x: 62, y: 21, price: 1650000, rent: 20630, repairLabel: 'Rewire electrics', repairCost: 363000 },
+  { id: 'skyline-4', zone: 'skyline', name: 'Regent Hall',    x: 54, y: 28, price: 2100000, rent: 26250, repairLabel: 'Renovate roof',    repairCost: 462000 },
+];
+
+// Renovation styles: pct = total cost as a share of the purchase price, bonus = permanent rent increase.
+const RENO = [
+  { name: 'None',   pct: 0,    bonus: 0 },
+  { name: 'Modern', pct: 0.15, bonus: 0.25 },
+  { name: 'Luxury', pct: 0.35, bonus: 0.6 },
+];
+
+// Education: pay `cost` (High School is free), then wait `secs` real seconds.
+const DEGREES = [
+  { id: 'highschool',   name: 'High School Diploma', cost: 0,     secs: 20,  needs: null },
+  { id: 'management',   name: 'Management Degree',   cost: 15000, secs: 45,  needs: 'highschool' },
+  { id: 'arts',         name: 'Arts Degree',         cost: 10000, secs: 40,  needs: 'highschool' },
+  { id: 'architecture', name: 'Architecture Degree', cost: 30000, secs: 75,  needs: 'highschool' },
+  { id: 'medical',      name: 'Medical Degree',      cost: 80000, secs: 120, needs: 'highschool' },
+];
+
+// Career paths. Each path has promotion tiers: pay = cash per Work tap.
+// taps = how many Work taps you need in this tier before you can be promoted to the next one (promotions are free).
+// needs = degree required to switch to the path.
+const CAREERS = [
+  { id: 'retail', name: 'Retail & Service', needs: null, tiers: [
+    { name: 'Cleaner',         pay: 8,  taps: 30 },
+    { name: 'Fastfood Worker', pay: 15, taps: 60 },
+    { name: 'Shop Assistant',  pay: 30, taps: 100 },
+    { name: 'Sales Agent',     pay: 60, taps: 0 },
+  ] },
+  { id: 'arts', name: 'Arts & Design', needs: 'arts', tiers: [
+    { name: 'Street Painter', pay: 70,  taps: 40 },
+    { name: 'Studio Painter', pay: 130, taps: 80 },
+    { name: 'Gallery Artist', pay: 240, taps: 140 },
+    { name: 'Master Artist',  pay: 420, taps: 0 },
+  ] },
+  { id: 'business', name: 'Business', needs: 'management', tiers: [
+    { name: 'Office Associate',   pay: 90,  taps: 50 },
+    { name: 'Sales Executive',    pay: 180, taps: 100 },
+    { name: 'Department Manager', pay: 350, taps: 160 },
+    { name: 'Corporate Director', pay: 650, taps: 0 },
+  ] },
+  { id: 'architecture', name: 'Architecture', needs: 'architecture', tiers: [
+    { name: 'Draftsman',        pay: 110, taps: 60 },
+    { name: 'Junior Architect', pay: 220, taps: 110 },
+    { name: 'Urban Planner',    pay: 420, taps: 180 },
+    { name: 'Chief Architect',  pay: 800, taps: 0 },
+  ] },
+  { id: 'medicine', name: 'Medicine', needs: 'medical', tiers: [
+    { name: 'Intern',           pay: 150,  taps: 50 },
+    { name: 'Resident',         pay: 300,  taps: 100 },
+    { name: 'Attending',        pay: 600,  taps: 200 },
+    { name: 'Chief of Surgery', pay: 1000, taps: 0 },
+  ] },
+];
+
+const STATUS = { repair: 'Needs repair', ready: 'Ready to rent', rented: 'Rented', broken: 'Broken' };
+// Each district has its own pin icon. The pin's color shows the property's status.
+const DISTRICT_ICON = { rustbelt: '🏚️', maple: '🏠', midtown: '🏢', harbor: '🏨', skyline: '🏙️' };
+
+/* ============================================================
+   2. STATE & SAVE MANAGER
+   ============================================================ */
+const newState = () => ({
+  version: 2,
+  hasStarted: false,        // false until the first loan is taken
+  lightMode: true,
+  audioOn: false,           // sound stays muted until the player turns it on
+  cash: 0,
+  loans: [],                // { id, name, principal, balance, rate, payment }
+  properties: [],           // see Game.act('buy') for the fields
+  unlockedDistricts: [DISTRICTS[0].id],
+  career: { path: 'retail', tiers: { retail: 0 }, taps: {}, totalTaps: 0, degrees: [], study: null, lastWork: 0 },
+  lastTick: Date.now(),
+  history: [],              // chart points: { cash, debt }
+  market: {},               // price multiplier of each building for sale (changes every cycle)
+  stats: { totalRent: 0, ticks: 0, loanPaid: 0, breakdowns: 0, loansPaidOff: 0, seized: 0 },
+});
+
+const SaveManager = {
+  load() {
+    try {
+      const raw = localStorage.getItem(CONFIG.SAVE_KEY);
+      if (!raw) return null;
+      const saved = JSON.parse(raw), base = newState();
+      const career = { ...base.career, ...saved.career };
+      delete career.job;    // left over from the old job ladder
+      delete career.held;
+      return { ...base, ...saved, career, stats: { ...base.stats, ...saved.stats } };
+    } catch (err) {
+      console.warn('Could not read save, starting fresh.', err);
+      return null;
+    }
+  },
+  save(state) {
+    try { localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(state)); }
+    catch (err) { console.warn('Could not save.', err); }
+  },
+  wipe() { localStorage.removeItem(CONFIG.SAVE_KEY); },
+};
+
+/* ============================================================
+   3. HELPERS
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const fmtMoney = (n) => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const fmtShort = (n) => (Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : Math.abs(n) >= 1000 ? Math.round(n / 1000) + 'k' : String(Math.round(n)));
+function fmtDuration(ms) {
+  const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
+  if (h > 0) return `${h}h ${m % 60}m`;
+  return m > 0 ? `${m}m` : `${Math.floor(ms / 1000)}s`;
+}
+const tenantRent = (base, kind) => Math.round(base * (kind === 'premium' ? 1.5 : 1));
+const findBuilding = (id) => BUILDINGS.find((b) => b.id === id);
+const findProp = (s, id) => s.properties.find((p) => p.id === id);
+const totalDebt = (s) => s.loans.reduce((a, l) => a + l.balance, 0);
+const baseRentOf = (p) => Math.round(p.origRent * (1 + RENO[p.reno].bonus));
+const offerOf = (p) => Math.round((p.buyPrice + p.repairCost + p.renoSpent) * p.market);   // what the market pays today
+const renoCost = (p, level) => Math.round((RENO[level].pct * p.buyPrice) / 100) * 100 - p.renoSpent;
+const statusKey = (p) => (p.broken ? 'broken' : p.status);
+const pinKey = (s, id) => { const p = findProp(s, id); return p ? statusKey(p) : 'sale'; };
+const priceOf = (s, b) => Math.round((b.price * (s.market[b.id] || 1)) / 10) * 10;                      // today's price of a building for sale
+const assetsOf = (s) => s.properties.reduce((sum, p) => sum + p.buyPrice + p.repairCost + p.renoSpent, 0);   // total property value
+const loanCheck = (s, o) => assetsOf(s) >= o.minAssets || s.stats.loansPaidOff >= o.minPaidOff;            // credit rule
+
+/* ============================================================
+   3b. SOUND  (music + sound effects, files live in assets/audio/)
+   ============================================================ */
+const Sound = {
+  muted: true,          // muted by default: browsers block sound until the player has tapped something
+  bgm: null,
+  sfx: {},
+  names: ['cash_in', 'cash_out', 'broken', 'repair', 'click', 'achievement'],
+
+  init(audioOn) {
+    this.bgm = new Audio('assets/audio/bgm.mp3');
+    this.bgm.loop = true;
+    this.bgm.volume = 0.3;
+    this.names.forEach((n) => {
+      const a = new Audio(`assets/audio/${n}.mp3`);
+      a.preload = 'auto';
+      this.sfx[n] = a;
+    });
+    this.muted = !audioOn;
+    // If sound was left on last time, the music can only start after the first tap.
+    document.addEventListener('pointerdown', () => this.startMusic(), { once: true });
+  },
+
+  startMusic() { if (!this.muted && this.bgm.paused) this.bgm.play().catch(() => {}); },
+
+  setMuted(m) {
+    this.muted = m;
+    if (m) this.bgm.pause();
+    else this.startMusic();
+  },
+
+  // Plays one sound effect (a fresh copy, so quick repeats can overlap). Does nothing while muted.
+  play(name) {
+    if (this.muted || !this.sfx[name]) return;
+    const a = this.sfx[name].cloneNode();
+    a.volume = name === 'click' ? 0.5 : 0.8;
+    a.play().catch(() => {});
+  },
+};
+
+/* ============================================================
+   4. ENGINE  (game rules; no DOM access)
+   ============================================================ */
+const Engine = {
+  // Rent earned in one cycle. Broken or unrented properties pay $0.
+  tickIncome(s) {
+    return s.properties.reduce((sum, p) => sum + (p.status === 'rented' && !p.broken ? p.rent : 0), 0);
+  },
+
+  // Deducts every loan installment (interest + principal). Cash may drop below $0 here;
+  // seizeAssets() then fixes that right away.
+  payLoans(s) {
+    const due = s.loans.reduce((a, l) => a + Math.min(l.payment, l.balance), 0);
+    if (due > 0) {
+      s.cash -= due;
+      s.stats.loanPaid += due;
+      s.loans.forEach((l) => { l.balance -= Math.min(l.payment, l.balance); });
+      const before = s.loans.length;
+      s.loans = s.loans.filter((l) => l.balance > 0);
+      s.stats.loansPaidOff += before - s.loans.length;
+    }
+    return due;
+  },
+
+  // Asset seizure: if cash is below $0 after the loan payment, the bank sells your cheapest
+  // property at its current market value, again and again, until cash is $0 or more.
+  // Only when no property is left and cash is STILL below $0 is it real bankruptcy.
+  seizeAssets(s, log) {
+    while (s.cash < 0 && s.properties.length > 0) {
+      const cheapest = s.properties.reduce((a, b) => (offerOf(b) < offerOf(a) ? b : a));
+      s.cash += offerOf(cheapest);
+      s.properties = s.properties.filter((p) => p.id !== cheapest.id);
+      log.seized.push(findBuilding(cheapest.id).name);
+      s.stats.seized += 1;
+    }
+    if (s.cash < 0) s.bankrupt = true;
+  },
+
+  // Each rented, working property has a small chance to break down.
+  rollBreakdowns(s) {
+    let n = 0;
+    for (const p of s.properties) {
+      if (p.status === 'rented' && !p.broken && Math.random() < CONFIG.BREAKDOWN_CHANCE) {
+        p.broken = true;
+        p.fixCost = Math.max(500, Math.round((p.repairCost * 0.4) / 100) * 100);
+        n++;
+      }
+    }
+    s.stats.breakdowns += n;
+    return n;
+  },
+
+  // Adds a chart point (or, with replaceLast, refreshes the newest one).
+  record(s, replaceLast) {
+    const point = { cash: s.cash, debt: totalDebt(s) };
+    if (replaceLast && s.history.length) s.history[s.history.length - 1] = point;
+    else s.history.push(point);
+    if (s.history.length > CONFIG.CHART_POINTS) s.history.shift();
+  },
+
+  // One 30s cycle. `live` is false while catching up on time the game was closed
+  // (nothing breaks while you're away).
+  processTick(s, live, log) {
+    const rent = this.tickIncome(s);
+    s.cash += rent;
+    s.stats.totalRent += rent;
+    s.stats.ticks += 1;
+    this.payLoans(s);
+    s.properties.forEach((p) => { p.market = 0.9 + Math.random() * 0.25; });   // sell offer: -10% .. +15%
+    BUILDINGS.forEach((b) => {                                                  // for-sale prices move +/-10%
+      if (!findProp(s, b.id)) s.market[b.id] = 1 + (Math.random() * 2 - 1) * CONFIG.MARKET_SWING;
+    });
+    this.seizeAssets(s, log);                                                   // the bank sells properties if cash < 0
+    if (live) this.rollBreakdowns(s);
+    if (s.stats.ticks % CONFIG.CHART_EVERY === 0) this.record(s, false);
+    return rent;
+  },
+
+  // Runs every cycle elapsed since s.lastTick (live play and offline catch-up).
+  advance(s, now) {
+    if (s.lastTick > now) s.lastTick = now;
+    const due = Math.floor((now - s.lastTick) / CONFIG.TICK_MS);
+    if (due <= 0) return null;
+
+    const maxTicks = Math.floor(CONFIG.MAX_OFFLINE_MS / CONFIG.TICK_MS);   // 4 hours: nothing is earned after this
+    const ticks = Math.min(due, maxTicks);
+    const before = { ...s.stats };
+    const log = { seized: [] };   // names of the properties the bank seized
+    let earned = 0;
+    for (let i = 0; i < ticks && !s.bankrupt; i++) earned += this.processTick(s, due === 1, log);
+
+    s.lastTick += due * CONFIG.TICK_MS;
+    return { ticks, earned, capped: due > maxTicks,
+      paid: s.stats.loanPaid - before.loanPaid, breaks: s.stats.breakdowns - before.breakdowns, seized: log.seized };
+  },
+
+  msToNextTick(s, now) { return CONFIG.TICK_MS - (now - s.lastTick); },
+};
+
+/* ============================================================
+   5. UI  (all DOM work)
+   ============================================================ */
+const UI = {
+  district: 'rustbelt',   // district selected on the map
+  building: null,         // pin selected on the map
+  openId: null,           // property open in the popup
+  buyId: null,            // property open in the buy popup
+  mapPos: null,           // remembered map scroll position
+  justDragged: false,     // true right after a mouse drag, so the drag doesn't count as a pin tap
+  alertTimer: null,       // hides the breakdown banner after 5 seconds
+  toastTimer: null,
+
+  init() {
+    document.querySelectorAll('.nav-btn').forEach((btn) =>
+      btn.addEventListener('click', () => this.showTab(btn.dataset.tab)));
+
+    $('district-tabs').addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      this.district = chip.dataset.district;
+      this.building = null;
+      this.renderMap(Game.state);
+      this.focusDistrict(this.district, false);
+    });
+
+    // Tap a pin: For Sale pins open the buy popup, owned pins open the management popup.
+    $('map-pins').addEventListener('click', (e) => {
+      const pin = e.target.closest('.pin');
+      if (!pin || this.justDragged) return;
+      const b = findBuilding(pin.dataset.id);
+      this.building = b.id;
+      this.district = b.zone;
+      if (findProp(Game.state, b.id)) this.openProperty(b.id);
+      else this.openBuy(b.id);
+      this.renderMap(Game.state);
+    });
+
+    // Drag-to-pan: press and drag (mouse or finger) to move the map. The map has no scrollbars.
+    const sc = $('map-scroll');
+    let drag = null;
+    sc.addEventListener('pointerdown', (e) => {
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: sc.scrollLeft, top: sc.scrollTop, moved: false };
+    });
+    sc.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) > 6) {
+        drag.moved = true;
+        sc.classList.add('dragging');
+        sc.setPointerCapture(e.pointerId);
+      }
+      if (drag.moved) { sc.scrollLeft = drag.left - dx; sc.scrollTop = drag.top - dy; }
+    });
+    const endDrag = () => {
+      if (drag && drag.moved) { this.justDragged = true; setTimeout(() => { this.justDragged = false; }, 0); }
+      drag = null;
+      sc.classList.remove('dragging');
+    };
+    sc.addEventListener('pointerup', endDrag);
+    sc.addEventListener('pointercancel', endDrag);
+
+    $('buy-close').addEventListener('click', () => this.closeBuy());
+    $('buy-modal').addEventListener('click', (e) => { if (e.target === $('buy-modal')) this.closeBuy(); });
+
+    // Every button with a data-act attribute (Buy, Repair, Rent, Work, Study...) is handled here.
+    document.body.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-act]');
+      if (b) Game.act(b.dataset.act, b.dataset.id, b.dataset.arg);
+    });
+
+    // Loan cards appear on the start screen and in the Bank tab (see renderLoanCards).
+    ['loan-options', 'new-loans'].forEach((id) => {
+      $(id).addEventListener('click', (e) => {
+        const card = e.target.closest('.loan-card');
+        if (card) Game.borrow(card.dataset.id);
+      });
+    });
+
+    $('pay-btn').addEventListener('click', () => Game.payEarly($('pay-amount').value));
+    $('theme-btn').addEventListener('click', () => Game.toggleTheme());
+    $('dev-cash-btn').addEventListener('click', () => Game.addCash(100000));
+    $('dev-cash-btn-1m').addEventListener('click', () => Game.addCash(1000000));
+    $('audio-btn').addEventListener('click', () => Game.toggleAudio());
+    $('restart-btn').addEventListener('click', () => Game.reset());
+    // Every button press plays the click sound.
+    document.addEventListener('click', (e) => { if (e.target.closest('button')) Sound.play('click'); });
+    $('alert-fix').addEventListener('click', () => {
+      this.showTab('map');
+      const broken = Game.state.properties.find((p) => p.broken);
+      if (broken) this.openProperty(broken.id);
+    });
+    $('reset-btn').addEventListener('click', () => { if (confirm('Erase your save and start over?')) Game.reset(); });
+    $('offline-close').addEventListener('click', () => $('offline-modal').classList.add('hidden'));
+    $('pm-close').addEventListener('click', () => this.closeProperty());
+    $('property-modal').addEventListener('click', (e) => { if (e.target === $('property-modal')) this.closeProperty(); });
+
+    $('version').textContent = `Game version ${GAME_VERSION}`;
+  },
+
+  showTab(name) {
+    const sc = $('map-scroll');
+    if ($('view-map').classList.contains('active')) this.mapPos = { left: sc.scrollLeft, top: sc.scrollTop };   // remember the map position
+    document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
+    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    if (name === 'map' && this.mapPos) { sc.scrollLeft = this.mapPos.left; sc.scrollTop = this.mapPos.top; }
+  },
+
+  applyTheme(light) {
+    document.body.classList.toggle('light-mode', light);
+    $('theme-btn').textContent = light ? 'Switch to dark mode' : 'Switch to light mode';
+  },
+
+  showLoanScreen() { $('app').classList.add('hidden'); $('loan-screen').classList.remove('hidden'); },
+  hideLoanScreen() { $('loan-screen').classList.add('hidden'); $('app').classList.remove('hidden'); },
+
+  showOffline(res) {
+    $('offline-text').textContent =
+      `You were away for ${fmtDuration(res.ticks * CONFIG.TICK_MS)}${res.capped ? ` (capped at ${fmtDuration(CONFIG.MAX_OFFLINE_MS)})` : ''}. ` +
+      `${res.ticks} cycles paid ${fmtMoney(res.earned)} in rent. Loan payments took ${fmtMoney(res.paid)}.` +
+      (res.seized.length ? ` The bank seized ${res.seized.length} ${res.seized.length === 1 ? 'property' : 'properties'} to cover your debts.` : '');
+    $('offline-modal').classList.remove('hidden');
+  },
+
+  toast(msg) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => el.classList.add('hidden'), 3000);
+  },
+
+  bankMsg(msg) { $('bank-msg').textContent = msg; },
+
+  // Shows several toasts one after another (used when the bank seizes more than one property).
+  toastSeq(msgs) { msgs.forEach((m, i) => setTimeout(() => this.toast(m), i * 2600)); },
+
+  applyAudio(on) { $('audio-btn').textContent = on ? 'Mute audio' : 'Unmute audio'; },
+
+  showGameOver() { $('gameover-modal').classList.remove('hidden'); },
+  hideGameOver() { $('gameover-modal').classList.add('hidden'); },
+
+  // A button that also enables/disables itself as cash changes (see refreshHud).
+  btn(act, id, label, cost = 0, cls = '', arg = '') {
+    return `<button class="btn ${cls}" data-act="${act}" data-id="${id}" data-arg="${arg}" data-cost="${cost}" ${Game.state.cash < cost ? 'disabled' : ''}>${label}</button>`;
+  },
+
+  // Cheap per-frame update: numbers, cycle bar, meters and button states.
+  refreshHud(s, now = Date.now()) {
+    const debt = totalDebt(s);
+    $('cash').textContent = fmtMoney(s.cash);
+    $('cash').classList.toggle('neg', s.cash < 0);
+    $('debt').textContent = fmtMoney(debt);
+    $('income').textContent = fmtMoney(Engine.tickIncome(s));
+    const left = Math.max(0, Engine.msToNextTick(s, now));
+    $('tick-fill').style.width = `${100 - (left / CONFIG.TICK_MS) * 100}%`;
+    $('tick-text').textContent = `Next cycle in ${Math.ceil(left / 1000)}s`;
+
+    const pos = Math.max(s.cash, 0), sum = pos + debt || 1;
+    $('meter-cash').style.width = `${(pos / sum) * 100}%`;
+    $('meter-debt').style.width = `${(debt / sum) * 100}%`;
+    $('meter-cash-text').textContent = fmtMoney(s.cash);
+    $('meter-debt-text').textContent = fmtMoney(debt);
+
+    document.querySelectorAll('[data-cost]').forEach((b) => { b.disabled = s.cash < Number(b.dataset.cost); });
+  },
+
+  renderAll(s) {
+    this.refreshHud(s);
+    this.renderMap(s);
+    this.renderCareer(s);
+    this.renderBank(s);
+    this.renderModal(s);
+    this.renderBuy(s);
+    this.renderLoanCards(s);
+  },
+
+  /* ---------- Map tab: pins for every property in an open district ---------- */
+  renderMap(s) {
+    // All five districts always appear as chips (they wrap onto two rows, so none is hidden).
+    $('district-tabs').innerHTML = DISTRICTS.map((d) => {
+      const open = s.unlockedDistricts.includes(d.id);
+      return `<button class="chip${d.id === this.district ? ' active' : ''}${open ? '' : ' locked'}" data-district="${d.id}">${open ? DISTRICT_ICON[d.id] : '🔒'} ${d.name}</button>`;
+    }).join('');
+
+    const countOwned = (id) => s.properties.filter((p) => findBuilding(p.id).zone === id).length;
+    const countAll = (id) => BUILDINGS.filter((b) => b.zone === id).length;
+
+    // Only the pins are drawn over the map picture: no outlines, borders or shaded areas.
+    $('map-pins').innerHTML = BUILDINGS.filter((b) => s.unlockedDistricts.includes(b.zone)).map((b) => {
+      const key = pinKey(s, b.id);
+      return `<button class="pin ${key}${this.building === b.id ? ' sel' : ''}" data-id="${b.id}" style="left:${b.x}%;top:${b.y}%">
+        <span class="pin-dot">${DISTRICT_ICON[b.zone]}</span><span class="pin-tag">${b.name}${key === 'sale' ? ` $${fmtShort(priceOf(s, b))}` : ''}</span></button>`;
+    }).join('');
+
+    const d = DISTRICTS.find((x) => x.id === this.district);
+    $('district-panel').innerHTML = s.unlockedDistricts.includes(d.id)
+      ? `<h2>${DISTRICT_ICON[d.id]} ${d.name}</h2><p class="muted">${countOwned(d.id)} of ${countAll(d.id)} properties owned. Tap a yellow pin to buy, or any other pin to manage that property.</p>`
+      : `<h2>🔒 ${d.name}</h2><p class="muted">Locked. Own ${d.unlockAt} properties to open this district (you own ${s.properties.length}).</p>`;
+  },
+
+  // Scrolls the map window so the middle of the district is in view.
+  focusDistrict(id, instant) {
+    const d = DISTRICTS.find((x) => x.id === id), sc = $('map-scroll'), r = d.rect;
+    const cx = ((r.x + r.w / 2) / 100) * WORLD.w, cy = ((r.y + r.h / 2) / 100) * WORLD.h;
+    sc.scrollTo({ left: Math.max(0, cx - sc.clientWidth / 2), top: Math.max(0, cy - sc.clientHeight / 2), behavior: instant ? 'auto' : 'smooth' });
+  },
+
+  // Red banner that drops down when a property breaks, plays the broken sound,
+  // and slides away again by itself after 5 seconds.
+  showBreakAlert(names) {
+    const el = $('alert-banner');
+    $('alert-text').textContent = names.length === 1
+      ? `⚠️ ${names[0]} broke down and pays no rent. Fix it now!`
+      : `⚠️ ${names.length} properties broke down (${names[0]} and more). Fix them now!`;
+    el.classList.add('show');
+    Sound.play('broken');
+    clearTimeout(this.alertTimer);
+    this.alertTimer = setTimeout(() => el.classList.remove('show'), CONFIG.BREAK_ALERT_MS);
+  },
+
+  // The loan cards on the start screen and in the Bank tab, with their credit requirements.
+  renderLoanCards(s) {
+    const html = LOAN_OPTIONS.map((o) => {
+      const ok = loanCheck(s, o), total = Math.round(o.amount * (1 + o.rate));
+      const need = ok ? '' : ` Locked: needs ${fmtMoney(o.minAssets)} in property value, or ${o.minPaidOff} paid-off loan.`;
+      return `<button class="loan-card${ok ? '' : ' locked'}" data-id="${o.id}" ${ok ? '' : 'disabled'}>
+        <strong>${o.name}</strong><span class="amount">${fmtMoney(o.amount)}</span>
+        <small>${(o.rate * 100).toFixed(0)}% interest. You repay ${fmtMoney(Math.ceil(total / CONFIG.LOAN_TERM_CYCLES))} every cycle for ${CONFIG.LOAN_TERM_CYCLES} cycles. ${o.desc}${need}</small></button>`;
+    }).join('');
+    $('loan-options').innerHTML = html;
+    $('new-loans').innerHTML = html;
+  },
+
+  /* ---------- Buy popup (opened by tapping a For Sale pin) ---------- */
+  openBuy(id) {
+    this.buyId = id;
+    $('buy-modal').classList.remove('hidden');
+    this.renderBuy(Game.state);
+  },
+
+  closeBuy() {
+    this.buyId = null;
+    $('buy-modal').classList.add('hidden');
+  },
+
+  renderBuy(s) {
+    if (!this.buyId) return;
+    const b = findBuilding(this.buyId);
+    if (!b || findProp(s, b.id)) { this.closeBuy(); return; }
+    const zone = DISTRICTS.find((d) => d.id === b.zone), price = priceOf(s, b), short = price - s.cash;
+    const swing = Math.round((price / b.price - 1) * 100);
+    $('buy-title').textContent = `${DISTRICT_ICON[b.zone]} ${b.name}`;
+    $('buy-body').innerHTML = `
+      <span class="pill sale">For sale</span>
+      <div class="stats">
+        <div class="row"><span>District</span><span>${zone.name}</span></div>
+        <div class="row"><span>Price today</span><strong>${fmtMoney(price)}</strong></div>
+        <div class="row"><span>Market</span><span>${swing >= 0 ? '+' : ''}${swing}% vs list price ${fmtMoney(b.price)}</span></div>
+        <div class="row"><span>Base rent</span><span>${fmtMoney(b.rent)} per cycle</span></div>
+        <div class="row"><span>First repair</span><span>${b.repairLabel}, ${fmtMoney(b.repairCost)}</span></div>
+      </div>
+      ${short > 0 ? `<p class="muted">You need ${fmtMoney(short)} more cash.</p>` : ''}
+      ${this.btn('buy', b.id, `Buy for ${fmtMoney(price)}`, price)}
+      <button class="btn ghost" data-act="closebuy">Cancel</button>`;
+  },
+
+  /* ---------- Property popup (opened by tapping an owned pin) ---------- */
+  openProperty(id) {
+    this.openId = id;
+    $('property-modal').classList.remove('hidden');
+    this.renderModal(Game.state);
+  },
+
+  closeProperty() {
+    this.openId = null;
+    $('property-modal').classList.add('hidden');
+  },
+
+  renderModal(s) {
+    if (!this.openId) return;
+    const p = findProp(s, this.openId);
+    if (!p) { this.closeProperty(); return; }
+    const b = findBuilding(p.id), key = statusKey(p);
+    const swing = Math.round((p.market - 1) * 100);
+    $('pm-title').textContent = b.name;
+
+    let actions = '';
+    if (p.broken) actions += this.btn('repair', p.id, `Repair for ${fmtMoney(p.fixCost)}`, p.fixCost, 'wide');
+    else if (p.status === 'repair') actions += this.btn('repair', p.id, `${p.repairLabel} for ${fmtMoney(p.repairCost)}`, p.repairCost, 'wide');
+    if (p.status === 'ready' && !p.broken) {
+      actions += this.btn('rent', p.id, `Normal tenant<br>${fmtMoney(tenantRent(p.baseRent, 'normal'))} per cycle`, 0, 'ghost', 'normal');
+      actions += this.btn('rent', p.id, `Premium tenant<br>${fmtMoney(tenantRent(p.baseRent, 'premium'))} per cycle`, 0, '', 'premium');
+    }
+    if (p.status === 'rented') actions += this.btn('evict', p.id, 'Evict tenant', 0, 'ghost wide');
+    if (p.status !== 'repair') {
+      [1, 2].forEach((lvl) => {
+        const done = p.reno >= lvl, cost = renoCost(p, lvl);
+        actions += done
+          ? `<button class="btn ghost" disabled>${RENO[lvl].name}<br>Done</button>`
+          : this.btn('reno', p.id, `Renovate: ${RENO[lvl].name}<br>${fmtMoney(cost)}, +${Math.round(RENO[lvl].bonus * 100)}% rent`, cost, '', String(lvl));
+      });
+    }
+    actions += this.btn('sell', p.id, `Sell for ${fmtMoney(offerOf(p))} (${swing >= 0 ? '+' : ''}${swing}% market)`, 0, 'sell wide');
+
+    $('pm-body').innerHTML = `
+      <span class="pill ${key}">${STATUS[key]}</span>
+      <div class="stats">
+        <div class="row"><span>Rent per cycle</span><strong>${p.status === 'rented' && !p.broken ? fmtMoney(p.rent) : '$0'}</strong></div>
+        <div class="row"><span>Base rent</span><span>${fmtMoney(p.baseRent)}</span></div>
+        <div class="row"><span>Tenant</span><span>${p.tenant ? (p.tenant === 'premium' ? 'Premium' : 'Normal') : 'None'}</span></div>
+        <div class="row"><span>Renovation</span><span>${RENO[p.reno].name}</span></div>
+        <div class="row"><span>Invested</span><span>${fmtMoney(p.buyPrice + p.repairCost + p.renoSpent)}</span></div>
+      </div>
+      <div class="manage">${actions}</div>`;
+  },
+
+  /* ---------- Career tab ---------- */
+  renderCareer(s) {
+    const c = s.career, { path, idx, tier } = Game.jobInfo();
+    const degName = (id) => DEGREES.find((d) => d.id === id).name;
+
+    const ladder = path.tiers.map((t, i) => `<div class="row center"><span>${i < idx ? '✓ ' : ''}<strong>${t.name}</strong></span>
+      <span>${fmtMoney(t.pay)} per tap ${i === idx ? '<span class="pill rented">Current</span>' : ''}</span></div>`).join('');
+    const next = path.tiers[idx + 1];
+    const promote = next
+      ? `<p class="muted" id="taps-text" style="margin-top:10px"></p><div class="bar"><i id="taps-fill"></i></div>
+         <button class="btn" id="promote-btn" data-act="promote" disabled>Promote to ${next.name} (free)</button>`
+      : '<p class="muted">You reached the top of this career.</p>';
+
+    const others = CAREERS.filter((p) => p.id !== path.id).map((p) => {
+      const reached = c.tiers[p.id];
+      const note = reached === undefined ? `Starts as ${p.tiers[0].name}.` : `You reached: ${p.tiers[reached].name}.`;
+      const tail = Game.canSwitch(p)
+        ? `<button class="btn ghost" data-act="switch" data-id="${p.id}">Switch to ${p.name}</button>`
+        : `<p class="muted">Locked: ${degName(p.needs)} required.</p>`;
+      return `<div class="item"><div class="row"><strong>${p.name}</strong><span>${fmtMoney(p.tiers[0].pay)}+ per tap</span></div><p class="muted">${note}</p>${tail}</div>`;
+    }).join('');
+
+    const degrees = DEGREES.map((d) => {
+      let tail;
+      if (c.degrees.includes(d.id)) tail = '<span class="pill ready">Earned</span>';
+      else if (c.study && c.study.id === d.id) tail = '<div class="bar"><i id="study-fill"></i></div><p class="muted" id="study-text"></p>';
+      else if (d.needs && !c.degrees.includes(d.needs)) tail = `<p class="muted">Locked: ${degName(d.needs)} required.</p>`;
+      else if (c.study) tail = '<button class="btn ghost" disabled>Busy studying</button>';
+      else tail = this.btn('study', d.id, d.cost ? 'Study' : 'Study (free)', d.cost, 'ghost');
+      return `<div class="item"><div class="row"><strong>${d.name}</strong><span>${d.cost ? fmtMoney(d.cost) : 'Free'}, ${d.secs}s</span></div>${tail}</div>`;
+    }).join('');
+
+    $('career-root').innerHTML = `
+      <div class="panel"><h2>Work</h2>
+        <p class="muted">${tier.name} (${path.name}): ${fmtMoney(tier.pay)} per tap</p>
+        <button class="btn work-btn" data-act="work">Work +${fmtMoney(tier.pay)}</button>
+        <p class="muted" id="taps-total" style="margin-top:8px"></p></div>
+      <div class="panel"><h2>Your career: ${path.name}</h2>${ladder}${promote}</div>
+      <div class="panel"><h2>Switch career</h2>${others}</div>
+      <div class="panel"><h2>Education</h2>${degrees}</div>`;
+    this.refreshTaps(s);
+    this.tickCareer(s, Date.now());
+  },
+
+  // Live update of the tap counter and the promotion progress (runs on every Work tap).
+  refreshTaps(s) {
+    const { path, idx, tier } = Game.jobInfo(), done = s.career.taps[path.id] || 0;
+    $('taps-total').textContent = `Total Work taps: ${s.career.totalTaps}`;
+    if (!path.tiers[idx + 1]) return;
+    const shown = Math.min(done, tier.taps);
+    $('taps-text').textContent = `Taps needed for promotion: ${shown}/${tier.taps}`;
+    $('taps-fill').style.width = `${(shown / tier.taps) * 100}%`;
+    $('promote-btn').disabled = shown < tier.taps;
+  },
+
+  // Updates the study progress bar every frame (the rest only re-renders on changes).
+  tickCareer(s, now) {
+    const st = s.career.study, fill = $('study-fill');
+    if (!st || !fill) return;
+    const d = DEGREES.find((x) => x.id === st.id), left = Math.max(0, st.endsAt - now);
+    fill.style.width = `${100 - (left / (d.secs * 1000)) * 100}%`;
+    $('study-text').textContent = `Studying: ${Math.ceil(left / 1000)}s left`;
+  },
+
+  /* ---------- Bank tab ---------- */
+  renderBank(s) {
+    const rows = s.loans.map((l) => `<div class="row"><span>${l.name}</span><span>${fmtMoney(l.balance)} left, ${fmtMoney(l.payment)} per cycle</span></div>`).join('');
+    $('loan-list').innerHTML = `<p class="muted">Active loans: ${s.loans.length}/${CONFIG.MAX_LOANS}. Property value: ${fmtMoney(assetsOf(s))}. Loans paid off: ${s.stats.loansPaidOff}.</p>`
+      + (rows || '<p class="muted">No active loans.</p>');
+    this.drawChart(s);
+  },
+
+  // Line graph of cash (gold) and debt (red). Plain canvas, no libraries.
+  drawChart(s) {
+    const cv = $('finance-chart'), ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height, L = 62, R = 12, T = 14, B = 30;
+    const css = getComputedStyle(document.body);
+    const col = (name) => css.getPropertyValue(name).trim();
+    const pts = s.history;
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = col('--muted');
+    if (pts.length < 2) { ctx.fillText('Collecting data... check back after a couple of cycles.', L, H / 2); return; }
+
+    const vals = pts.flatMap((p) => [p.cash, p.debt]);
+    const lo = Math.min(0, ...vals), hi = Math.max(1, ...vals);
+    const x = (i) => L + (i / (pts.length - 1)) * (W - L - R);
+    const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const v = lo + ((hi - lo) * i) / 4;
+      ctx.strokeStyle = col('--line');
+      ctx.beginPath(); ctx.moveTo(L, y(v)); ctx.lineTo(W - R, y(v)); ctx.stroke();
+      ctx.fillStyle = col('--muted');
+      ctx.fillText((v < 0 ? '-$' : '$') + fmtShort(Math.abs(v)), 4, y(v) + 4);
+    }
+    ctx.fillStyle = col('--muted');
+    ctx.fillText('Time (older  >  newer)', L, H - 8);
+
+    const line = (key, color) => {
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath();
+      pts.forEach((p, i) => { if (i) ctx.lineTo(x(i), y(p[key])); else ctx.moveTo(x(i), y(p[key])); });
+      ctx.stroke();
+    };
+    line('debt', col('--red'));
+    line('cash', col('--gold'));
+  },
+};
+
+/* ============================================================
+   6. GAME CONTROLLER  (state, loop, player actions)
+   ============================================================ */
+const Game = {
+  state: null,
+  loopTimer: null,
+  saveTimer: null,
+
+  init() {
+    this.state = SaveManager.load() || newState();
+    Sound.init(this.state.audioOn);
+    UI.init();
+    UI.applyTheme(this.state.lightMode);
+    UI.applyAudio(this.state.audioOn);
+    UI.renderAll(this.state);
+    if (this.state.hasStarted) this.resume();
+    else UI.showLoanScreen();
+  },
+
+  // Returning player: collect everything earned while the game was closed.
+  resume() {
+    const res = Engine.advance(this.state, Date.now());
+    this.checkStudy(Date.now());
+    if (this.checkBankruptcy()) return;
+    SaveManager.save(this.state);
+    UI.hideLoanScreen();
+    UI.focusDistrict(UI.district, true);
+    UI.renderAll(this.state);
+    if (res && res.ticks >= 2) UI.showOffline(res);
+    this.announceSeized(res);
+    this.startLoop();
+  },
+
+  startLoop() {
+    clearInterval(this.loopTimer);
+    clearInterval(this.saveTimer);
+    this.loopTimer = setInterval(() => this.frame(), CONFIG.UI_REFRESH_MS);
+    this.saveTimer = setInterval(() => SaveManager.save(this.state), CONFIG.AUTOSAVE_MS);
+  },
+
+  // Runs 4x per second. Timestamp-based, so background tabs catch up correctly.
+  frame() {
+    const now = Date.now();
+    const wasBroken = new Set(this.state.properties.filter((p) => p.broken).map((p) => p.id));
+    const res = Engine.advance(this.state, now);
+    if (this.checkBankruptcy()) return;
+    if (this.checkStudy(now)) UI.renderAll(this.state);
+    if (res) {
+      SaveManager.save(this.state);
+      UI.renderAll(this.state);
+      if (res.earned > 0) Sound.play('cash_in');                       // rent was collected
+      const fresh = this.state.properties.filter((p) => p.broken && !wasBroken.has(p.id)).map((p) => findBuilding(p.id).name);
+      if (fresh.length) UI.showBreakAlert(fresh);                      // new breakdown: 5 second banner
+      if (res.ticks > 1) UI.showOffline(res);
+      else if (!res.seized.length) {
+        const parts = [];
+        if (res.earned > 0) parts.push(`+${fmtMoney(res.earned)} Rent`);
+        if (res.paid > 0) parts.push(`-${fmtMoney(res.paid)} Bank Rate`);
+        if (res.breaks > 0) parts.push('Breakdown!');
+        if (parts.length) UI.toast(parts.join(' | '));
+      }
+      this.announceSeized(res);
+    }
+    UI.refreshHud(this.state, now);
+    UI.tickCareer(this.state, now);
+  },
+
+  // One toast for every property the bank seized in the last cycle(s).
+  announceSeized(res) {
+    if (res && res.seized.length) UI.toastSeq(res.seized.map((n) => `Bank seized ${n} to cover debts!`));
+  },
+
+  // Saves, refreshes everything. Called after every player action.
+  commit() {
+    this.checkUnlocks();
+    Engine.record(this.state, true);
+    SaveManager.save(this.state);
+    UI.renderAll(this.state);
+  },
+
+  checkUnlocks() {
+    const s = this.state;
+    DISTRICTS.forEach((d) => {
+      if (s.properties.length >= d.unlockAt && !s.unlockedDistricts.includes(d.id)) {
+        s.unlockedDistricts.push(d.id);
+        UI.toast(`${d.name} unlocked: new properties listed`);
+      }
+    });
+  },
+
+  /* ----- Bank ----- */
+  // Takes a loan. The very first one starts the game.
+  borrow(id) {
+    const s = this.state, opt = LOAN_OPTIONS.find((o) => o.id === id);
+    if (!opt) return;
+    if (!loanCheck(s, opt)) { UI.bankMsg(`${opt.name} is locked: you need ${fmtMoney(opt.minAssets)} in property value, or ${opt.minPaidOff} paid-off loan.`); return; }
+    if (s.hasStarted && s.loans.length >= CONFIG.MAX_LOANS) { UI.bankMsg(`You can only have ${CONFIG.MAX_LOANS} active loans. Pay one off first.`); return; }
+    const total = Math.round(opt.amount * (1 + opt.rate));   // principal + interest
+    s.cash += opt.amount;
+    s.loans.push({ id: `${opt.id}-${Date.now()}`, name: opt.name, principal: opt.amount, balance: total, rate: opt.rate,
+      payment: Math.ceil(total / CONFIG.LOAN_TERM_CYCLES) });
+    if (!s.hasStarted) {
+      s.hasStarted = true;
+      s.lastTick = Date.now();
+      s.history = [];
+      Engine.record(s, false);
+      UI.hideLoanScreen();
+      UI.focusDistrict(UI.district, true);
+      this.startLoop();
+    } else {
+      UI.bankMsg(`Loan received: ${fmtMoney(opt.amount)}. You owe ${fmtMoney(total)} on it.`);
+    }
+    Sound.play('cash_in');
+    this.commit();
+  },
+
+  // Pays a custom amount toward the debt, oldest loan first.
+  payEarly(raw) {
+    const s = this.state, debt = totalDebt(s), amount = Math.floor(Number(raw));
+    if (!(amount > 0)) { UI.bankMsg('Enter an amount to pay.'); return; }
+    if (debt <= 0) { UI.bankMsg('You have no debt.'); return; }
+    const pay = Math.min(amount, debt);
+    if (s.cash < pay) { UI.bankMsg(`Not enough cash. You have ${fmtMoney(s.cash)}.`); return; }
+    let left = pay;
+    for (const l of s.loans) {
+      const x = Math.min(l.balance, left);
+      l.balance -= x;
+      left -= x;
+      if (left <= 0) break;
+    }
+    const openLoans = s.loans.length;
+    s.loans = s.loans.filter((l) => l.balance > 0);
+    s.stats.loansPaidOff += openLoans - s.loans.length;
+    s.cash -= pay;
+    s.stats.loanPaid += pay;
+    $('pay-amount').value = '';
+    UI.bankMsg(`Paid ${fmtMoney(pay)} toward your loans.`);
+    this.commit();
+  },
+
+  /* ----- Settings ----- */
+  toggleTheme() {
+    this.state.lightMode = !this.state.lightMode;
+    UI.applyTheme(this.state.lightMode);
+    this.commit();
+  },
+
+  addCash(n) {
+    this.state.cash += n;
+    UI.toast(`Developer: added ${fmtMoney(n)}`);
+    this.commit();
+  },
+
+  toggleAudio() {
+    this.state.audioOn = !this.state.audioOn;
+    Sound.setMuted(!this.state.audioOn);
+    UI.applyAudio(this.state.audioOn);
+    SaveManager.save(this.state);
+  },
+
+  /* ----- Properties and career actions (all buttons with data-act land here) ----- */
+  act(type, id, arg) {
+    const s = this.state;
+    if (type === 'closebuy') { UI.closeBuy(); return; }
+    if (type === 'work') { this.work(); return; }
+    if (type === 'switch') { this.switchPath(id); return; }
+    if (type === 'promote') { this.promote(); return; }
+    if (type === 'study') { this.startStudy(id); return; }
+
+    const b = findBuilding(id), p = findProp(s, id);
+    if (!b) return;
+
+    if (type === 'buy') {
+      const price = priceOf(s, b);
+      if (p || !s.unlockedDistricts.includes(b.zone) || s.cash < price) return;
+      s.cash -= price;
+      s.properties.push({ id, buyPrice: price, origRent: b.rent, baseRent: b.rent, repairLabel: b.repairLabel, repairCost: b.repairCost,
+        status: 'repair', tenant: null, rent: 0, broken: false, fixCost: 0, reno: 0, renoSpent: 0, market: 1 });
+      UI.closeBuy();
+      Sound.play('cash_out');
+      UI.toast(`Bought ${b.name}. Tap its pin to manage it.`);
+    } else if (!p) {
+      return;
+    } else if (type === 'repair') {
+      const cost = p.broken ? p.fixCost : p.status === 'repair' ? p.repairCost : -1;
+      if (cost < 0 || s.cash < cost) return;
+      s.cash -= cost;
+      p.broken = false;
+      if (p.status === 'repair') p.status = 'ready';
+      Sound.play('repair');
+    } else if (type === 'rent') {
+      if (p.status !== 'ready' || p.broken) return;
+      p.tenant = arg === 'premium' ? 'premium' : 'normal';
+      p.rent = tenantRent(p.baseRent, p.tenant);
+      p.status = 'rented';
+    } else if (type === 'evict') {
+      if (p.status !== 'rented') return;
+      p.status = 'ready';
+      p.tenant = null;
+      p.rent = 0;
+    } else if (type === 'reno') {
+      const lvl = Number(arg);
+      if (!RENO[lvl] || lvl <= p.reno || p.status === 'repair') return;
+      const cost = renoCost(p, lvl);
+      if (s.cash < cost) return;
+      s.cash -= cost;
+      p.renoSpent += cost;
+      p.reno = lvl;
+      p.baseRent = baseRentOf(p);
+      if (p.status === 'rented') p.rent = tenantRent(p.baseRent, p.tenant);
+      Sound.play('repair');
+    } else if (type === 'sell') {
+      const offer = offerOf(p);
+      s.cash += offer;
+      s.properties = s.properties.filter((x) => x.id !== id);
+      UI.closeProperty();
+      Sound.play('cash_in');
+      UI.toast(`Sold ${b.name} for ${fmtMoney(offer)}`);
+    } else {
+      return;
+    }
+    this.commit();
+  },
+
+  /* ----- Career ----- */
+  // The player's current path, tier number and tier.
+  jobInfo() {
+    const c = this.state.career, path = CAREERS.find((p) => p.id === c.path), idx = c.tiers[c.path] || 0;
+    return { path, idx, tier: path.tiers[idx] };
+  },
+
+  // One Work tap: earns the tier's pay and counts toward the next promotion.
+  work() {
+    const c = this.state.career, now = Date.now();
+    if (now - c.lastWork < CONFIG.WORK_COOLDOWN_MS) return;
+    c.lastWork = now;
+    c.totalTaps += 1;
+    c.taps[c.path] = (c.taps[c.path] || 0) + 1;
+    this.state.cash += this.jobInfo().tier.pay;
+    UI.refreshHud(this.state, now);
+    UI.refreshTaps(this.state);
+  },
+
+  // A path can be joined if it needs no degree or you own the degree.
+  canSwitch(path) {
+    return !path.needs || this.state.career.degrees.includes(path.needs);
+  },
+
+  // Switching keeps your progress in every path: going back resumes at your old tier.
+  switchPath(id) {
+    const c = this.state.career, path = CAREERS.find((p) => p.id === id);
+    if (!path || id === c.path || !this.canSwitch(path)) return;
+    c.path = id;
+    if (c.tiers[id] === undefined) c.tiers[id] = 0;
+    this.commit();
+  },
+
+  // Free promotion to the next tier, once enough Work taps were made in the current tier.
+  promote() {
+    const c = this.state.career, { path, idx, tier } = this.jobInfo(), next = path.tiers[idx + 1];
+    if (!next || (c.taps[path.id] || 0) < tier.taps) return;
+    c.tiers[path.id] = idx + 1;
+    c.taps[path.id] = 0;
+    Sound.play('achievement');
+    UI.toast(`Promoted to ${next.name}!`);
+    this.commit();
+  },
+
+  startStudy(id) {
+    const c = this.state.career, d = DEGREES.find((x) => x.id === id);
+    if (!d || c.study || c.degrees.includes(id)) return;
+    if (d.needs && !c.degrees.includes(d.needs)) return;
+    if (this.state.cash < d.cost) return;
+    this.state.cash -= d.cost;
+    c.study = { id, endsAt: Date.now() + d.secs * 1000 };
+    this.commit();
+  },
+
+  // Awards a degree once its timer is up (also works after being offline).
+  checkStudy(now) {
+    const c = this.state.career;
+    if (!c.study || now < c.study.endsAt) return false;
+    const d = DEGREES.find((x) => x.id === c.study.id);
+    c.degrees.push(d.id);
+    c.study = null;
+    Sound.play('achievement');
+    UI.toast(`Degree earned: ${d.name}`);
+    SaveManager.save(this.state);
+    return true;
+  },
+
+  /* ----- Game over / restart ----- */
+  checkBankruptcy() {
+    if (!this.state.bankrupt) return false;
+    this.gameOver();
+    return true;
+  },
+
+  // True game over: the bank seized every property and you still owe money.
+  gameOver() {
+    clearInterval(this.loopTimer);
+    clearInterval(this.saveTimer);
+    SaveManager.wipe();
+    UI.closeProperty();
+    UI.closeBuy();
+    UI.showGameOver();
+  },
+
+  reset() {
+    clearInterval(this.loopTimer);
+    clearInterval(this.saveTimer);
+    SaveManager.wipe();
+    const light = this.state.lightMode, audio = this.state.audioOn;
+    this.state = newState();
+    this.state.lightMode = light;
+    this.state.audioOn = audio;
+    UI.hideGameOver();
+    UI.closeProperty();
+    UI.closeBuy();
+    UI.district = 'rustbelt';
+    UI.building = null;
+    UI.showTab('map');
+    UI.renderAll(this.state);
+    UI.showLoanScreen();
+  },
+
+  // Console helper: Game.debugRewind(120), then reload to test offline progress.
+  debugRewind(minutes) {
+    this.state.lastTick -= minutes * 60_000;
+    SaveManager.save(this.state);
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => Game.init());
+</script>
+</body>
+</html>
